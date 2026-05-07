@@ -4,6 +4,7 @@ import { ResearchResult, SearchParams } from '../lib/types';
 import { formatNumber } from '../lib/utils';
 import { QuotaCard } from './QuotaCard';
 import { SearchForm } from './SearchForm';
+import { UpdateBanner } from './UpdateBanner';
 
 interface HomePanelProps {
   initial: SearchParams;
@@ -15,6 +16,7 @@ interface HomePanelProps {
   hasApiKey: boolean;
   quota: QuotaState;
   onMissingApiKey: () => void;
+  onOpenChangelog: () => void;
 }
 
 export function HomePanel({
@@ -26,10 +28,12 @@ export function HomePanel({
   result,
   hasApiKey,
   quota,
-  onMissingApiKey
+  onMissingApiKey,
+  onOpenChangelog
 }: HomePanelProps) {
   return (
     <div className="space-y-6">
+      <UpdateBanner onOpenChangelog={onOpenChangelog} />
       <QuotaCard used={quota.used} searchCount={quota.searchCount} />
 
       <SearchForm
@@ -37,6 +41,7 @@ export function HomePanel({
         onRun={onRun}
         running={running}
         hasApiKey={hasApiKey}
+        quotaUsed={quota.used}
         onMissingApiKey={onMissingApiKey}
       />
 
@@ -65,6 +70,37 @@ export function HomePanel({
           <Stat label="消費ユニット(目安)" value={`約${result.estimatedQuota}`} />
         </div>
       )}
+
+      <CreatorCredit />
+    </div>
+  );
+}
+
+function CreatorCredit() {
+  return (
+    <div className="pt-6 mt-2 border-t border-slate-200">
+      <div className="text-center text-xs text-slate-500 space-y-1.5">
+        <div>制作者：めぐペン</div>
+        <div className="flex items-center justify-center gap-3">
+          <a
+            href="https://note.com/megupen12/portal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-500 hover:text-brand-600 hover:underline transition-colors"
+          >
+            note
+          </a>
+          <span className="text-slate-300">·</span>
+          <a
+            href="https://substack.com/@megupen"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-500 hover:text-brand-600 hover:underline transition-colors"
+          >
+            Substack
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
