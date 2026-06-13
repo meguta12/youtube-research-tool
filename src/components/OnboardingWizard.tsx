@@ -41,7 +41,7 @@ export function OnboardingWizard({ hasApiKey, onSaveApiKey, onClearApiKey, onCom
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold">1. このツールでできること</h2>
                 <ul className="list-disc pl-5 text-slate-700 space-y-1.5 text-sm">
-                  <li>キーワードでYouTube動画を一括取得（最大100件）</li>
+                  <li>キーワードでYouTube動画を一括取得（最大300件）</li>
                   <li>1日平均再生数・登録者比など独自指標で並び替え</li>
                   <li>競合チャンネルの「再現性スコア」を自動算出</li>
                   <li>頻出ワード・投稿曜日・投稿時間帯の傾向分析</li>

@@ -87,6 +87,8 @@ export function VideoList({ videos }: VideoListProps) {
               <th className="w-32">サムネ</th>
               <th>タイトル</th>
               <th>チャンネル</th>
+              <th>国</th>
+              <th>子ども向け</th>
               <th className="text-right">登録者</th>
               <th className="text-right">再生数</th>
               <th className="text-right">1日平均</th>
@@ -132,6 +134,8 @@ export function VideoList({ videos }: VideoListProps) {
                     {v.channelTitle}
                   </a>
                 </td>
+                <td className="whitespace-nowrap">{v.channelCountry || '-'}</td>
+                <td className="whitespace-nowrap">{formatMadeForKids(v.channelMadeForKids)}</td>
                 <td className="text-right">{formatNumber(v.subscriberCount)}</td>
                 <td className="text-right font-semibold">{formatNumber(v.viewCount)}</td>
                 <td className="text-right">{formatNumber(Math.round(v.viewsPerDay))}</td>
@@ -157,6 +161,12 @@ export function VideoList({ videos }: VideoListProps) {
       </div>
     </div>
   );
+}
+
+function formatMadeForKids(value: boolean | null): string {
+  if (value === true) return '子ども向け';
+  if (value === false) return '対象外';
+  return '不明';
 }
 
 function EmptyState() {

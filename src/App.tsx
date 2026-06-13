@@ -11,6 +11,7 @@ import { LicenseGate } from './components/LicenseGate';
 import { Modal } from './components/Modal';
 import { HelpPanel } from './components/HelpPanel';
 import { HistoryPanel } from './components/HistoryPanel';
+import { ChangelogContent } from './components/UpdateBanner';
 import { isLicenseRequired, validateLicense } from './lib/license';
 import {
   addQuotaUsage,
@@ -83,6 +84,7 @@ export function App() {
   const [result, setResult] = useState<ResearchResult | null>(() => (isManualMainDemo ? MANUAL_DEMO_RESULT : null));
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [quota, setQuota] = useState<QuotaState>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA : getQuotaUsage()));
   const [history, setHistory] = useState<HistoryEntry[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_HISTORY : getHistory()));
   const [quotaDays, setQuotaDays] = useState<QuotaDailyRecord[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA_DAYS : getQuotaHistory(7)));
@@ -217,6 +219,7 @@ export function App() {
             hasApiKey={Boolean(config.apiKey)}
             quota={quota}
             onMissingApiKey={() => setShowSettings(true)}
+            onOpenChangelog={() => setShowChangelog(true)}
           />
         )}
         {view === 'history' && (
@@ -270,6 +273,10 @@ export function App() {
 
       <Modal open={showHelp} title="使い方" onClose={() => setShowHelp(false)}>
         <HelpPanel />
+      </Modal>
+
+      <Modal open={showChangelog} title="アップデート履歴" onClose={() => setShowChangelog(false)}>
+        <ChangelogContent />
       </Modal>
     </>
   );

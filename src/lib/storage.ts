@@ -1,4 +1,16 @@
-import { AppConfig, ResearchResult, SearchParams } from './types';
+import {
+  AppConfig,
+  ChannelAgeKey,
+  CHANNEL_AGE_FILTERS,
+  DurationKey,
+  KidsFilterKey,
+  KIDS_FILTERS,
+  MAX_RESULT_COUNTS,
+  ResearchResult,
+  SearchParams,
+  SearchRegionCode,
+  SEARCH_REGIONS
+} from './types';
 
 const KEYS = {
   apiKey: 'yt-research:api-key',
@@ -67,17 +79,71 @@ export function saveConfig(config: Omit<AppConfig, 'apiKey'>): void {
 const DEFAULT_PARAMS: SearchParams = {
   keyword: '',
   period: '今月',
-  duration: '4-20分',
+  duration: '横長動画',
   order: '視聴回数',
-  maxResults: 50
+  maxResults: 50,
+  subscriberRange: 'all',
+  ignoreSubscriberFilter: false,
+  regionCode: 'JP',
+  channelAge: 'all',
+  ignoreChannelAgeFilter: false,
+  kidsFilter: 'all'
 };
 
 export function getLastParams(): SearchParams {
-  return { ...DEFAULT_PARAMS, ...safeRead(KEYS.lastParams, {}) };
+  return normalizeSearchParams({ ...DEFAULT_PARAMS, ...safeRead(KEYS.lastParams, {}) });
 }
 
 export function saveLastParams(params: SearchParams): void {
   safeWrite(KEYS.lastParams, params);
+}
+
+function normalizeSearchParams(raw: SearchParams): SearchParams {
+  return {
+    ...raw,
+    duration: normalizeDuration(raw.duration),
+    maxResults: normalizeMaxResults(raw.maxResults),
+    regionCode: normalizeRegionCode(raw.regionCode),
+    channelAge: normalizeChannelAge(raw.channelAge),
+    ignoreSubscriberFilter: normalizeBoolean(raw.ignoreSubscriberFilter, false),
+    ignoreChannelAgeFilter: normalizeBoolean(raw.ignoreChannelAgeFilter, false),
+    kidsFilter: normalizeKidsFilter(raw.kidsFilter)
+  };
+}
+
+function normalizeDuration(value: unknown): DurationKey {
+  if (value === 'ショート動画' || value === '4分未満（ショート寄り）' || value === '4分未満') {
+    return 'ショート動画';
+  }
+  return '横長動画';
+}
+
+function normalizeMaxResults(value: unknown): number {
+  const n = Number(value) || DEFAULT_PARAMS.maxResults;
+  const allowed = [...MAX_RESULT_COUNTS];
+  if (allowed.includes(n as (typeof MAX_RESULT_COUNTS)[number])) return n;
+  return allowed.reduce((closest, current) => (
+    Math.abs(current - n) < Math.abs(closest - n) ? current : closest
+  ), DEFAULT_PARAMS.maxResults);
+}
+
+function normalizeRegionCode(value: unknown): SearchRegionCode {
+  const code = String(value || '').toUpperCase();
+  return SEARCH_REGIONS.some((r) => r.code === code) ? (code as SearchRegionCode) : 'JP';
+}
+
+function normalizeChannelAge(value: unknown): ChannelAgeKey {
+  const key = String(value || '');
+  return CHANNEL_AGE_FILTERS.some((r) => r.key === key) ? (key as ChannelAgeKey) : 'all';
+}
+
+function normalizeKidsFilter(value: unknown): KidsFilterKey {
+  const key = String(value || '');
+  return KIDS_FILTERS.some((r) => r.key === key) ? (key as KidsFilterKey) : 'all';
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 export interface HistoryEntry {

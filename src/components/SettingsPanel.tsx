@@ -40,7 +40,7 @@ export function SettingsPanel({ config, onSaveApiKey, onClearApiKey, onSaveOptio
       </section>
 
       <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-2">フィルタ・地域設定</h3>
+        <h3 className="text-sm font-semibold text-slate-700 mb-2">フィルタ・詳細設定</h3>
         <form onSubmit={handleSaveOptions} className="rounded-md border border-slate-200 bg-white p-4 space-y-4">
           <div>
             <label className="label">除外ワード（カンマ区切り）</label>
@@ -63,7 +63,7 @@ export function SettingsPanel({ config, onSaveApiKey, onClearApiKey, onSaveOptio
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">地域コード</label>
+              <label className="label">既定の地域コード</label>
               <input
                 className="input mt-1"
                 value={regionCode}
@@ -72,7 +72,7 @@ export function SettingsPanel({ config, onSaveApiKey, onClearApiKey, onSaveOptio
               />
             </div>
             <div>
-              <label className="label">関連言語</label>
+              <label className="label">既定の関連言語</label>
               <input
                 className="input mt-1"
                 value={language}

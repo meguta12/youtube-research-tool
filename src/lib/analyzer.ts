@@ -5,6 +5,8 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
   const grouped: Record<string, {
     channelId: string;
     channelTitle: string;
+    channelCountry: string;
+    channelMadeForKids: boolean | null;
     subscriberCount: number;
     totalVideoCount: number;
     channelPublishedAt: string;
@@ -19,6 +21,8 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
       grouped[video.channelId] = {
         channelId: video.channelId,
         channelTitle: video.channelTitle,
+        channelCountry: video.channelCountry,
+        channelMadeForKids: video.channelMadeForKids,
         subscriberCount: video.subscriberCount,
         totalVideoCount: video.channelVideoCount,
         channelPublishedAt: video.channelPublishedAt,
@@ -46,6 +50,8 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
       return {
         channelId,
         channelTitle: group.channelTitle,
+        channelCountry: group.channelCountry,
+        channelMadeForKids: group.channelMadeForKids,
         subscriberCount: group.subscriberCount,
         totalVideoCount: group.totalVideoCount,
         channelPublishedDate: group.channelPublishedAt

@@ -6,3 +6,13 @@ dist
 .env.production.local
 .DS_Store
 *.log
+.vercel
+
+# 販売・マーケティング資料（OSS公開リポジトリには含めない）
+manual/
+HANDOFF_TO_CODEX.md
+購入者向けマニュアル.md
+
+# ローカル設定・ビルドキャッシュ
+.claude/
+*.tsbuildinfo

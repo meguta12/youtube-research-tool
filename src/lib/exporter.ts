@@ -1,5 +1,13 @@
 import * as XLSX from 'xlsx';
-import { ResearchResult } from './types';
+import {
+  getChannelAgeFilter,
+  getKidsFilter,
+  getSearchRegion,
+  getSubscriberRange,
+  isChannelAgeFilterActive,
+  isSubscriberFilterActive,
+  ResearchResult
+} from './types';
 import { formatNumber } from './utils';
 
 export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtube-research.xlsx'): void {
@@ -8,6 +16,8 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
   const videoRows = result.videos.map((v) => ({
     タイトル: v.title,
     チャンネル名: v.channelTitle,
+    チャンネル国: v.channelCountry || '',
+    子ども向け: formatMadeForKids(v.channelMadeForKids),
     登録者数: v.subscriberCount,
     再生数: v.viewCount,
     高評価数: v.likeCount,
@@ -27,6 +37,8 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
 
   const channelRows = result.channels.map((c) => ({
     チャンネル名: c.channelTitle,
+    チャンネル国: c.channelCountry || '',
+    子ども向け: formatMadeForKids(c.channelMadeForKids),
     登録者数: c.subscriberCount,
     総動画数: c.totalVideoCount,
     開設日: c.channelPublishedDate,
@@ -50,9 +62,13 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
 
   const summaryRows = [
     ['キーワード', result.params.keyword],
+    ['検索地域', getSearchRegion(result.params.regionCode).label],
     ['期間', result.params.period],
-    ['動画尺', result.params.duration],
+    ['動画タイプ', result.params.duration],
     ['並び替え', result.params.order],
+    ['登録者数', isSubscriberFilterActive(result.params) ? getSubscriberRange(result.params.subscriberRange).label : '考慮しない'],
+    ['チャンネル開設日', isChannelAgeFilterActive(result.params) ? getChannelAgeFilter(result.params.channelAge).label : '考慮しない'],
+    ['子ども向け', getKidsFilter(result.params.kidsFilter).label],
     ['取得件数', result.videos.length],
     ['消費ユニット(目安)', `約${result.estimatedQuota}`],
     ['検索日時', new Date(result.searchedAt).toLocaleString('ja-JP')],
@@ -65,12 +81,14 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
 
 export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-videos.csv'): void {
   const rows = [
-    ['タイトル', 'チャンネル名', '登録者数', '再生数', '高評価数', 'コメント数', '公開日', '1日平均再生数', '動画尺', '動画URL', 'チャンネルURL']
+    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', '公開日', '1日平均再生数', '動画尺', '動画URL', 'チャンネルURL']
   ];
   result.videos.forEach((v) => {
     rows.push([
       v.title,
       v.channelTitle,
+      v.channelCountry || '',
+      formatMadeForKids(v.channelMadeForKids),
       String(v.subscriberCount),
       String(v.viewCount),
       String(v.likeCount),
@@ -94,4 +112,10 @@ export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function formatMadeForKids(value: boolean | null): string {
+  if (value === true) return '子ども向け';
+  if (value === false) return '子ども向けではない';
+  return '不明';
 }

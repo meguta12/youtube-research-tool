@@ -30,6 +30,8 @@ const demoVideos: Video[] = [
     channelId: 'demo-channel-01',
     title: '【副業】会社員が月5万円を作るために最初にやること5選',
     channelTitle: '副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 82000,
     channelVideoCount: 164,
     channelPublishedAt: '2023-01-08T00:00:00.000Z',
@@ -54,6 +56,8 @@ const demoVideos: Video[] = [
     channelId: 'demo-channel-02',
     title: '初心者向け 在宅ワークの始め方 2026年版',
     channelTitle: '在宅ワーク研究所',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 41000,
     channelVideoCount: 91,
     channelPublishedAt: '2024-06-12T00:00:00.000Z',
@@ -78,6 +82,8 @@ const demoVideos: Video[] = [
     channelId: 'demo-channel-01',
     title: '副業で失敗しない人の共通点 ベスト7',
     channelTitle: '副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 82000,
     channelVideoCount: 164,
     channelPublishedAt: '2023-01-08T00:00:00.000Z',
@@ -102,6 +108,8 @@ const demoVideos: Video[] = [
     channelId: 'demo-channel-03',
     title: '動画編集副業は今からでも遅くない？現実的な収益ライン',
     channelTitle: '編集者の働き方',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 126000,
     channelVideoCount: 286,
     channelPublishedAt: '2022-03-15T00:00:00.000Z',
@@ -127,6 +135,8 @@ const demoChannels: ChannelRow[] = [
   {
     channelId: 'demo-channel-01',
     channelTitle: '副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 82000,
     totalVideoCount: 164,
     channelPublishedDate: '2023/01/08',
@@ -141,6 +151,8 @@ const demoChannels: ChannelRow[] = [
   {
     channelId: 'demo-channel-02',
     channelTitle: '在宅ワーク研究所',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 41000,
     totalVideoCount: 91,
     channelPublishedDate: '2024/06/12',
@@ -155,6 +167,8 @@ const demoChannels: ChannelRow[] = [
   {
     channelId: 'demo-channel-04',
     channelTitle: 'おうちで稼ぐ大学',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
     subscriberCount: 9600,
     totalVideoCount: 24,
     channelPublishedDate: '2025/08/02',
@@ -210,14 +224,20 @@ export const MANUAL_DEMO_RESULT: ResearchResult = {
   params: {
     keyword: '副業',
     period: '今月',
-    duration: '4-20分',
+    duration: '横長動画',
     order: '視聴回数',
-    maxResults: 50
+    maxResults: 50,
+    subscriberRange: 'all',
+    ignoreSubscriberFilter: false,
+    regionCode: 'JP',
+    channelAge: 'all',
+    ignoreChannelAgeFilter: false,
+    kidsFilter: 'all'
   } satisfies SearchParams,
   videos: demoVideos,
   channels: demoChannels,
   competitorStats: demoCompetitorStats,
-  estimatedQuota: 132
+  estimatedQuota: 610
 };
 
 export const MANUAL_DEMO_CONFIG: AppConfig = {
@@ -239,7 +259,7 @@ export const MANUAL_DEMO_HISTORY: HistoryEntry[] = [
     searchedAt: '2026-04-28T09:15:00.000Z',
     keyword: '副業',
     count: 50,
-    estimatedQuota: 132
+    estimatedQuota: 610
   },
   {
     searchedAt: '2026-04-27T18:42:00.000Z',

@@ -4,8 +4,9 @@ export function HelpPanel() {
       <section>
         <h3 className="font-semibold text-slate-800 mb-1">基本の流れ</h3>
         <ol className="list-decimal pl-5 space-y-1 text-slate-700">
-          <li>ホーム画面でキーワード・期間・動画尺・並び替え・取得件数を選びます。</li>
-          <li>「▶ リサーチ実行」を押します。</li>
+          <li>ホーム画面でキーワード・期間・検索地域・動画タイプ・並び替え・取得件数・登録者数・チャンネル開設日・子ども向けを選びます。</li>
+          <li>登録者数やチャンネル開設日を使わない場合は「この条件を使わない（節約）」にチェックします。</li>
+          <li>「▶ リサーチ実行」を押します（事前に「推定消費」をチェック）。</li>
           <li>「動画リスト」「チャンネル分析」「競合分析」「サムネ一覧」で結果を確認します。</li>
           <li>右上の「Excelダウンロード」で保存できます。</li>
         </ol>
@@ -25,7 +26,7 @@ export function HelpPanel() {
         <h3 className="font-semibold text-slate-800 mb-1">APIキーについて</h3>
         <ul className="list-disc pl-5 space-y-1 text-slate-700">
           <li>あなたのブラウザだけに保存されます。<strong>当方や第三者のサーバーに送信されることはありません</strong>。通信先はGoogle公式（googleapis.com）のみです。</li>
-          <li>無料枠は1日10,000ユニット。1回のリサーチで概ね100〜200ユニット消費します。</li>
+          <li>無料枠は1日10,000ユニット。取得件数が多いほど消費ユニットも増えます。</li>
           <li>もし「quotaExceeded」と出たら、翌日（太平洋時間0:00 ≒ 日本時間17:00）に自動でリセットされます。</li>
         </ul>
       </section>

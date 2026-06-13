@@ -23,6 +23,8 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
           <thead>
             <tr>
               <th>チャンネル名</th>
+              <th>国</th>
+              <th>子ども向け</th>
               <th className="text-right">登録者</th>
               <th className="text-right">総動画数</th>
               <th>開設日</th>
@@ -50,6 +52,8 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
                     {c.channelTitle}
                   </a>
                 </td>
+                <td className="whitespace-nowrap">{c.channelCountry || '-'}</td>
+                <td className="whitespace-nowrap">{formatMadeForKids(c.channelMadeForKids)}</td>
                 <td className="text-right">{formatNumber(c.subscriberCount)}</td>
                 <td className="text-right">{formatNumber(c.totalVideoCount)}</td>
                 <td className="whitespace-nowrap">{c.channelPublishedDate}</td>
@@ -75,4 +79,10 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
       </div>
     </div>
   );
+}
+
+function formatMadeForKids(value: boolean | null): string {
+  if (value === true) return '子ども向け';
+  if (value === false) return '対象外';
+  return '不明';
 }
