@@ -18,13 +18,17 @@ import {
   clearApiKey,
   clearHistory,
   clearQuotaHistory,
+  clearSavedResearchResults,
   getApiKey,
   getConfig,
   getHistory,
   getLastParams,
+  getLastResearchResult,
   getLicense,
   getQuotaHistory,
   getQuotaUsage,
+  getSavedResearchResult,
+  getSavedResearchResultKeys,
   HistoryEntry,
   isOnboarded,
   markOnboarded,
@@ -33,6 +37,7 @@ import {
   QuotaState,
   saveConfig,
   saveLastParams,
+  saveResearchResult,
   setApiKey,
   setLicense
 } from './lib/storage';
@@ -62,7 +67,14 @@ function initialDemoView(): ViewKey {
   return 'home';
 }
 
+function getInitialResearchResult(): ResearchResult | null {
+  if (isManualMainDemo) return MANUAL_DEMO_RESULT;
+  if (isManualProgressDemo) return null;
+  return getLastResearchResult();
+}
+
 export function App() {
+  const initialResearchResult = getInitialResearchResult();
   const [licenseUnlocked, setLicenseUnlocked] = useState<boolean>(() => {
     if (demoMode === 'license') return false;
     if (isManualMainDemo || isManualProgressDemo) return true;
@@ -77,16 +89,19 @@ export function App() {
   });
   const [config, setConfig] = useState<AppConfig>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_CONFIG : getConfig()));
   const [view, setView] = useState<ViewKey>(() => initialDemoView());
-  const [params, setParams] = useState<SearchParams>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_RESULT.params : getLastParams()));
+  const [params, setParams] = useState<SearchParams>(() => (
+    isManualProgressDemo ? MANUAL_DEMO_RESULT.params : initialResearchResult ? initialResearchResult.params : getLastParams()
+  ));
   const [running, setRunning] = useState(isManualProgressDemo);
   const [progress, setProgress] = useState<ResearchProgress | null>(() => (isManualProgressDemo ? MANUAL_DEMO_PROGRESS : null));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [result, setResult] = useState<ResearchResult | null>(() => (isManualMainDemo ? MANUAL_DEMO_RESULT : null));
+  const [result, setResult] = useState<ResearchResult | null>(() => initialResearchResult);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [quota, setQuota] = useState<QuotaState>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA : getQuotaUsage()));
   const [history, setHistory] = useState<HistoryEntry[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_HISTORY : getHistory()));
+  const [savedResultKeys, setSavedResultKeys] = useState<string[]>(() => (isManualMainDemo || isManualProgressDemo ? [] : getSavedResearchResultKeys()));
   const [quotaDays, setQuotaDays] = useState<QuotaDailyRecord[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA_DAYS : getQuotaHistory(7)));
 
   useEffect(() => {
@@ -123,6 +138,7 @@ export function App() {
     try {
       const r = await runResearch(nextParams, config, setProgress);
       setResult(r);
+      saveResearchResult(r);
       const entry: HistoryEntry = {
         searchedAt: r.searchedAt,
         keyword: r.params.keyword,
@@ -133,6 +149,7 @@ export function App() {
       addQuotaUsage(r.estimatedQuota);
       setQuota(getQuotaUsage());
       setHistory(getHistory());
+      setSavedResultKeys(getSavedResearchResultKeys());
       setQuotaDays(getQuotaHistory(7));
       if (r.videos.length === 0) {
         setErrorMessage('該当する動画が見つかりませんでした。条件を変えてお試しください。');
@@ -226,6 +243,15 @@ export function App() {
           <HistoryPanel
             history={history}
             quotaDays={quotaDays}
+            savedResultKeys={savedResultKeys}
+            onRestore={(searchedAt) => {
+              const saved = getSavedResearchResult(searchedAt);
+              if (!saved) return;
+              setResult(saved);
+              setParams(saved.params);
+              saveLastParams(saved.params);
+              setView('videos');
+            }}
             onRerun={(keyword) => {
               const next = { ...params, keyword };
               setParams(next);
@@ -234,7 +260,10 @@ export function App() {
             }}
             onClearHistory={() => {
               clearHistory();
+              clearSavedResearchResults();
               setHistory([]);
+              setSavedResultKeys([]);
+              setResult(null);
             }}
             onClearQuota={() => {
               clearQuotaHistory();

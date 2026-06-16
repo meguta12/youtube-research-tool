@@ -4,6 +4,8 @@ import { formatNumber } from '../lib/utils';
 interface HistoryPanelProps {
   history: HistoryEntry[];
   quotaDays: QuotaDailyRecord[];
+  savedResultKeys: string[];
+  onRestore: (searchedAt: string) => void;
   onRerun: (keyword: string) => void;
   onClearHistory: () => void;
   onClearQuota: () => void;
@@ -12,10 +14,14 @@ interface HistoryPanelProps {
 export function HistoryPanel({
   history,
   quotaDays,
+  savedResultKeys,
+  onRestore,
   onRerun,
   onClearHistory,
   onClearQuota
 }: HistoryPanelProps) {
+  const savedResultKeySet = new Set(savedResultKeys);
+
   return (
     <div className="space-y-6">
       <div className="card">
@@ -107,10 +113,19 @@ export function HistoryPanel({
                     <td className="font-medium">{h.keyword}</td>
                     <td className="text-right">{h.count}件</td>
                     <td className="text-right">約 {formatNumber(h.estimatedQuota)}</td>
-                    <td>
+                    <td className="whitespace-nowrap text-right">
+                      {savedResultKeySet.has(h.searchedAt) && (
+                        <button
+                          type="button"
+                          className="mr-3 text-xs font-medium text-brand-600 hover:underline"
+                          onClick={() => onRestore(h.searchedAt)}
+                        >
+                          表示
+                        </button>
+                      )}
                       <button
                         type="button"
-                        className="text-xs text-brand-600 hover:underline"
+                        className="text-xs text-slate-500 hover:text-brand-600 hover:underline"
                         onClick={() => onRerun(h.keyword)}
                       >
                         ↻ 再検索

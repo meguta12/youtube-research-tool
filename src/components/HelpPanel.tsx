@@ -48,7 +48,8 @@ export function HelpPanel() {
       <section>
         <h3 className="font-semibold text-slate-800 mb-1">データの取り扱い</h3>
         <ul className="list-disc pl-5 space-y-1 text-slate-700">
-          <li>検索条件、APIキー、検索結果、検索履歴、クォータ使用量すべてあなたのブラウザの中だけに保存されます。</li>
+          <li>検索条件、APIキー、直近100件の検索結果、検索履歴、クォータ使用量すべてあなたのブラウザの中だけに保存されます。</li>
+          <li>検索履歴の「表示」から、保存済みの分析結果をAPI消費なしで開き直せます。</li>
           <li>本ツールは外部分析サービス（Google Analyticsなど）を一切使用していません。</li>
           <li>ブラウザの履歴/Cookieを削除すると、保存された設定や履歴も消えます。Excel保存でのバックアップを推奨します。</li>
         </ul>

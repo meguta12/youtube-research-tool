@@ -17,12 +17,14 @@ const KEYS = {
   config: 'yt-research:config',
   lastParams: 'yt-research:last-params',
   history: 'yt-research:history',
+  savedResults: 'yt-research:saved-results',
   license: 'yt-research:license',
   onboarded: 'yt-research:onboarded',
   quota: 'yt-research:quota'
 };
 
 export const DAILY_QUOTA_LIMIT = 10000;
+const MAX_SAVED_RESULTS = 100;
 
 function safeRead<T>(key: string, fallback: T): T {
   try {
@@ -165,6 +167,32 @@ export function pushHistory(entry: HistoryEntry): void {
 
 export function clearHistory(): void {
   localStorage.removeItem(KEYS.history);
+}
+
+export function getSavedResearchResults(): ResearchResult[] {
+  const results = safeRead<ResearchResult[]>(KEYS.savedResults, []);
+  return Array.isArray(results) ? results : [];
+}
+
+export function getSavedResearchResultKeys(): string[] {
+  return getSavedResearchResults().map((result) => result.searchedAt);
+}
+
+export function getLastResearchResult(): ResearchResult | null {
+  return getSavedResearchResults()[0] ?? null;
+}
+
+export function getSavedResearchResult(searchedAt: string): ResearchResult | null {
+  return getSavedResearchResults().find((result) => result.searchedAt === searchedAt) ?? null;
+}
+
+export function saveResearchResult(result: ResearchResult): void {
+  const list = getSavedResearchResults().filter((item) => item.searchedAt !== result.searchedAt);
+  safeWrite(KEYS.savedResults, [result, ...list].slice(0, MAX_SAVED_RESULTS));
+}
+
+export function clearSavedResearchResults(): void {
+  localStorage.removeItem(KEYS.savedResults);
 }
 
 /**
