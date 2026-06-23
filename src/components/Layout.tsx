@@ -64,8 +64,27 @@ export function Layout({ current, onNavigate, onOpenSettings, onOpenHelp, childr
         <div className="mx-auto max-w-7xl px-4 py-6">{children}</div>
       </main>
       <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-slate-500">
-          YouTube Data API v3 を使用しています。APIキーはご利用者ご自身のブラウザのみに保存されます。
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>YouTube Data API v3 を使用しています。APIキーはご利用者ご自身のブラウザのみに保存されます。</span>
+          <span className="flex items-center gap-3 whitespace-nowrap">
+            <span className="text-slate-400">制作者：めぐペン</span>
+            <a
+              href="https://x.com/K1sqttPHfC41982"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-500 hover:text-brand-600"
+            >
+              X
+            </a>
+            <a
+              href="https://note.com/shiny_ruff980/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-500 hover:text-brand-600"
+            >
+              note
+            </a>
+          </span>
         </div>
       </footer>
     </div>
