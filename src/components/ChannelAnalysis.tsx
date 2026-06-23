@@ -31,6 +31,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
               <th className="text-right">運営月数</th>
               <th className="text-right">ヒット数</th>
               <th className="text-right">平均再生</th>
+              <th className="text-right">中央値再生</th>
               <th className="text-right">最高再生</th>
               <th className="text-right">再現性スコア</th>
               <th>判定</th>
@@ -60,6 +61,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
                 <td className="text-right">{c.operationMonths}ヶ月</td>
                 <td className="text-right">{c.hitCount}</td>
                 <td className="text-right">{formatNumber(Math.round(c.averageViews))}</td>
+                <td className="text-right">{formatNumber(Math.round(c.medianViews))}</td>
                 <td className="text-right">{formatNumber(c.maxViews)}</td>
                 <td className="text-right font-semibold">{c.reproducibilityScore.toFixed(4)}</td>
                 <td>
@@ -74,8 +76,9 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
           </tbody>
         </table>
       </div>
-      <div className="card-body text-xs text-slate-500">
-        ※「伸びチャンス」= 運営12ヶ月未満 かつ ヒット動画の平均再生数が1万以上のチャンネル。新興で勢いのある競合の指標です。
+      <div className="card-body text-xs text-slate-500 space-y-1">
+        <p>※「伸びチャンス」= 運営12ヶ月未満 かつ ヒット動画の平均再生数が1万以上のチャンネル。新興で勢いのある競合の指標です。</p>
+        <p>※「中央値再生」は1本のバズに引っ張られにくい指標。平均より大きく低い場合、そのチャンネルは数本の当たりに支えられている可能性があります。</p>
       </div>
     </div>
   );

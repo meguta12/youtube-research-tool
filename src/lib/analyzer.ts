@@ -1,5 +1,5 @@
 import { AppConfig, ChannelRow, CompetitorStats, Video, YouTubeChannelItem } from './types';
-import { formatDate, getMonthDiff, uniqueValues } from './utils';
+import { formatDate, getMonthDiff, median, uniqueValues } from './utils';
 
 export function aggregateChannels(videos: Video[], _channelMap: Record<string, YouTubeChannelItem>): ChannelRow[] {
   const grouped: Record<string, {
@@ -13,6 +13,7 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
     hitCount: number;
     totalViews: number;
     maxViews: number;
+    views: number[];
     channelUrl: string;
   }> = {};
 
@@ -29,6 +30,7 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
         hitCount: 0,
         totalViews: 0,
         maxViews: 0,
+        views: [],
         channelUrl: video.channelUrl
       };
     }
@@ -36,12 +38,14 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
     group.hitCount += 1;
     group.totalViews += video.viewCount;
     group.maxViews = Math.max(group.maxViews, video.viewCount);
+    group.views.push(video.viewCount);
   });
 
   return Object.keys(grouped)
     .map<ChannelRow>((channelId) => {
       const group = grouped[channelId];
       const averageViews = group.hitCount > 0 ? group.totalViews / group.hitCount : 0;
+      const medianViews = median(group.views);
       const reproducibilityScore =
         group.totalVideoCount > 0 ? group.hitCount / group.totalVideoCount : 0;
       const operationMonths = group.channelPublishedAt
@@ -60,6 +64,7 @@ export function aggregateChannels(videos: Video[], _channelMap: Record<string, Y
         operationMonths,
         hitCount: group.hitCount,
         averageViews,
+        medianViews,
         maxViews: group.maxViews,
         reproducibilityScore,
         channelUrl: group.channelUrl,

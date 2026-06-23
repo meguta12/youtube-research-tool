@@ -63,6 +63,18 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * 中央値。空配列なら 0。
+ * 平均（mean）は1本のバズで大きく釣り上がるため、
+ * 「そのチャンネルのいつもの実力」を見るのに中央値を併用する。
+ */
+export function median(values: number[]): number {
+  if (!values || values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 export function splitCsv(value: string): string[] {
   return String(value || '')
     .split(/[,\n、]/)

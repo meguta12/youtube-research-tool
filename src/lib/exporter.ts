@@ -22,12 +22,13 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
     再生数: v.viewCount,
     高評価数: v.likeCount,
     コメント数: v.commentCount,
+    'エンゲージメント率(%)': v.engagementRate !== null ? Number((v.engagementRate * 100).toFixed(2)) : '',
     公開日: v.publishedDate,
     経過日数: v.elapsedDays,
     '1日平均再生数': Math.round(v.viewsPerDay),
     登録者比: v.subscriberRatio !== null ? Number(v.subscriberRatio.toFixed(2)) : '',
+    アウトライアー倍率: v.outlierMultiplier !== null ? Number(v.outlierMultiplier.toFixed(2)) : '',
     動画尺: v.duration,
-    タグ: v.tags,
     動画URL: v.videoUrl,
     チャンネルURL: v.channelUrl,
     急上昇: v.risingFlag
@@ -45,6 +46,7 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
     運営月数: c.operationMonths,
     ヒット数: c.hitCount,
     平均再生数: Math.round(c.averageViews),
+    中央値再生数: Math.round(c.medianViews),
     最高再生数: c.maxViews,
     再現性スコア: Number(c.reproducibilityScore.toFixed(4)),
     チャンネルURL: c.channelUrl,
@@ -81,7 +83,7 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
 
 export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-videos.csv'): void {
   const rows = [
-    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', '公開日', '1日平均再生数', '動画尺', '動画URL', 'チャンネルURL']
+    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', 'エンゲージメント率(%)', '公開日', '1日平均再生数', '登録者比', 'アウトライアー倍率', '動画尺', '動画URL', 'チャンネルURL']
   ];
   result.videos.forEach((v) => {
     rows.push([
@@ -93,8 +95,11 @@ export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-
       String(v.viewCount),
       String(v.likeCount),
       String(v.commentCount),
+      v.engagementRate !== null ? (v.engagementRate * 100).toFixed(2) : '',
       v.publishedDate,
       String(Math.round(v.viewsPerDay)),
+      v.subscriberRatio !== null ? v.subscriberRatio.toFixed(2) : '',
+      v.outlierMultiplier !== null ? v.outlierMultiplier.toFixed(2) : '',
       v.duration,
       v.videoUrl,
       v.channelUrl

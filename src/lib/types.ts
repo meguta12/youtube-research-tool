@@ -138,11 +138,13 @@ export interface Video {
   viewCount: number;
   likeCount: number;
   commentCount: number;
+  engagementRate: number | null;
   publishedAt: string;
   publishedDate: string;
   elapsedDays: number;
   viewsPerDay: number;
   subscriberRatio: number | null;
+  outlierMultiplier: number | null;
   duration: string;
   durationSeconds: number;
   tags: string;
@@ -163,6 +165,7 @@ export interface ChannelRow {
   operationMonths: number;
   hitCount: number;
   averageViews: number;
+  medianViews: number;
   maxViews: number;
   reproducibilityScore: number;
   channelUrl: string;

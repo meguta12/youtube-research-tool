@@ -18,6 +18,7 @@ import {
   formatDuration,
   getBestThumbnailUrl,
   getPublishedAfter,
+  median,
   parseIsoDuration,
   toInteger,
   uniqueValues
@@ -182,7 +183,7 @@ export function normalizeVideos(
   channelMap: Record<string, YouTubeChannelItem>
 ): Video[] {
   const now = new Date();
-  return videoItems
+  const videos: Video[] = videoItems
     .map((item) => {
       const snippet = item.snippet;
       const statistics = item.statistics || {};
@@ -202,9 +203,13 @@ export function normalizeVideos(
       const publishedAt = new Date(snippet.publishedAt);
       const elapsedDays = Math.max(1, Math.ceil((now.getTime() - publishedAt.getTime()) / 86400000));
       const viewCount = toInteger(statistics.viewCount, 0);
+      const likeCount = toInteger(statistics.likeCount, 0);
+      const commentCount = toInteger(statistics.commentCount, 0);
       const subscriberCount = toInteger(channelStats.subscriberCount, 0);
       const viewsPerDay = viewCount / elapsedDays;
       const subscriberRatio = subscriberCount > 0 ? viewCount / subscriberCount : null;
+      // エンゲージメント率 =（高評価＋コメント）÷ 再生数。視聴者の反応の濃さを測る。
+      const engagementRate = viewCount > 0 ? (likeCount + commentCount) / viewCount : null;
       const durationSeconds = parseIsoDuration(contentDetails.duration || 'PT0S');
       const videoId = item.id;
       const channelId = snippet.channelId;
@@ -220,13 +225,15 @@ export function normalizeVideos(
         channelVideoCount: toInteger(channelStats.videoCount, 0),
         channelPublishedAt: channelSnippet.publishedAt || '',
         viewCount,
-        likeCount: toInteger(statistics.likeCount, 0),
-        commentCount: toInteger(statistics.commentCount, 0),
+        likeCount,
+        commentCount,
+        engagementRate,
         publishedAt: snippet.publishedAt || '',
         publishedDate: formatDate(publishedAt),
         elapsedDays,
         viewsPerDay,
         subscriberRatio,
+        outlierMultiplier: null, // チャンネル別の中央値を後段で計算してから埋める
         duration: formatDuration(durationSeconds),
         durationSeconds,
         tags: (snippet.tags || []).join(', '),
@@ -235,8 +242,29 @@ export function normalizeVideos(
         channelUrl: buildChannelUrl(channelId),
         risingFlag: subscriberRatio !== null && subscriberRatio > 1 ? '🔥' : ''
       } satisfies Video;
-    })
-    .sort((a, b) => b.viewsPerDay - a.viewsPerDay);
+    });
+
+  // アウトライアー倍率 = その動画の再生数 ÷ 同じチャンネルの中央値再生数（この取得結果内）。
+  // 登録者数に依存しないので「大手でも跳ねた動画」を見つけられる。
+  // ただし基準を作るにはそのチャンネルの動画が2本以上必要。1本だけなら null（判定不能）。
+  // 基準はあえて絞り込み前の全取得動画で取る（サンプルが多いほど中央値が安定するため）。
+  const viewsByChannel: Record<string, number[]> = {};
+  videos.forEach((v) => {
+    (viewsByChannel[v.channelId] ||= []).push(v.viewCount);
+  });
+  // 中央値はチャンネルごとに1回だけ計算（動画ごとに呼ぶと同じ配列を何度もソートしてしまう）。
+  const medianByChannel: Record<string, number> = {};
+  Object.keys(viewsByChannel).forEach((channelId) => {
+    medianByChannel[channelId] = median(viewsByChannel[channelId]);
+  });
+  videos.forEach((v) => {
+    const channelViews = viewsByChannel[v.channelId];
+    if (!channelViews || channelViews.length < 2) return;
+    const base = medianByChannel[v.channelId];
+    v.outlierMultiplier = base > 0 ? v.viewCount / base : null;
+  });
+
+  return videos.sort((a, b) => b.viewsPerDay - a.viewsPerDay);
 }
 
 export function estimateQuota(videoCount: number, channelCount: number, searchCallCount: number = 1): number {
