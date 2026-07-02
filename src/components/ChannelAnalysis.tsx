@@ -10,7 +10,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
     return (
       <div className="card">
         <div className="card-body text-center text-slate-500">
-          リサーチを実行すると、複数本ヒットしたチャンネルの「再現性スコア」が表示されます。
+          リサーチを実行すると、複数本ヒットしたチャンネルの「特化度」が表示されます。
         </div>
       </div>
     );
@@ -33,7 +33,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
               <th className="text-right">平均再生</th>
               <th className="text-right">中央値再生</th>
               <th className="text-right">最高再生</th>
-              <th className="text-right">再現性スコア</th>
+              <th className="text-right">特化度（KWヒット率）</th>
               <th>判定</th>
             </tr>
           </thead>
@@ -63,7 +63,12 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
                 <td className="text-right">{formatNumber(Math.round(c.averageViews))}</td>
                 <td className="text-right">{formatNumber(Math.round(c.medianViews))}</td>
                 <td className="text-right">{formatNumber(c.maxViews)}</td>
-                <td className="text-right font-semibold">{c.reproducibilityScore.toFixed(4)}</td>
+                <td className="text-right font-semibold">
+                  {c.reproducibilityScore.toFixed(4)}
+                  <span className="ml-1 font-normal text-slate-500">
+                    ({(c.reproducibilityScore * 100).toFixed(1)}%)
+                  </span>
+                </td>
                 <td>
                   {c.isOpportunity ? (
                     <span className="badge bg-emerald-100 text-emerald-800">伸びチャンス</span>
@@ -77,6 +82,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
         </table>
       </div>
       <div className="card-body text-xs text-slate-500 space-y-1">
+        <p>※「特化度（KWヒット率）」= このキーワードでヒットした本数 ÷ チャンネルの総投稿本数。値が高いほどこの話題に専念しているチャンネルです。総投稿数が多い大手は低く出やすいので、「ヒット数」や「中央値再生」と併せて見てください。</p>
         <p>※「伸びチャンス」= 運営12ヶ月未満 かつ ヒット動画の平均再生数が1万以上のチャンネル。新興で勢いのある競合の指標です。</p>
         <p>※「中央値再生」は1本のバズに引っ張られにくい指標。平均より大きく低い場合、そのチャンネルは数本の当たりに支えられている可能性があります。</p>
       </div>

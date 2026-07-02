@@ -48,7 +48,7 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
     平均再生数: Math.round(c.averageViews),
     中央値再生数: Math.round(c.medianViews),
     最高再生数: c.maxViews,
-    再現性スコア: Number(c.reproducibilityScore.toFixed(4)),
+    '特化度(KWヒット率)': Number(c.reproducibilityScore.toFixed(4)),
     チャンネルURL: c.channelUrl,
     伸びチャンス: c.isOpportunity ? '◎' : ''
   }));
@@ -61,6 +61,14 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
     平均再生数: Math.round(w.averageViews)
   }));
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(wordRows), '頻出ワード');
+
+  const bigramRows = result.competitorStats.topBigrams.map((b, index) => ({
+    順位: index + 1,
+    '2語の組み合わせ': b.phrase,
+    出現回数: b.count,
+    平均再生数: Math.round(b.averageViews)
+  }));
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(bigramRows), '2語の組み合わせ');
 
   const summaryRows = [
     ['キーワード', result.params.keyword],

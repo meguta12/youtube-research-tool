@@ -4,7 +4,7 @@ import { maskApiKey } from '../lib/utils';
 
 interface ApiKeySetupProps {
   currentKey: string;
-  onSave: (key: string) => void;
+  onSave: (key: string) => boolean | void;
   onClear: () => void;
 }
 
@@ -21,7 +21,13 @@ export function ApiKeySetup({ currentKey, onSave, onClear }: ApiKeySetupProps) {
     setErrorMsg('');
     try {
       await testApiKey(input.trim());
-      onSave(input.trim());
+      const saved = onSave(input.trim());
+      // 明示的に false のときだけ保存失敗（void を返す呼び出し元は成功扱い）。
+      if (saved === false) {
+        setState('error');
+        setErrorMsg('保存に失敗しました（ブラウザの保存容量やプライベートモードをご確認ください）');
+        return;
+      }
       setInput('');
       setState('ok');
     } catch (err: any) {

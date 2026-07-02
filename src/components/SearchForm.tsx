@@ -12,10 +12,17 @@ import {
   SearchParams,
   SearchRegionCode,
   SUBSCRIBER_RANGES,
-  SubscriberRangeKey
+  SubscriberRangeKey,
+  VIDEO_CATEGORIES
 } from '../lib/types';
 import { estimateQuotaBeforeRun } from '../lib/youtube';
-import { DAILY_QUOTA_LIMIT } from '../lib/storage';
+import {
+  DAILY_QUOTA_LIMIT,
+  deletePreset,
+  getPresets,
+  savePreset,
+  SearchPreset
+} from '../lib/storage';
 import { formatNumber } from '../lib/utils';
 
 interface SearchFormProps {
@@ -25,10 +32,17 @@ interface SearchFormProps {
   hasApiKey: boolean;
   quotaUsed: number;
   onMissingApiKey: () => void;
+  onApplyParams: (params: SearchParams) => void;
 }
 
 const PERIODS: PeriodKey[] = ['今日', '今週', '今月', '3ヶ月', '全期間'];
-const DURATIONS: DurationKey[] = ['ショート動画', '横長動画'];
+// 単一バケット（4-20分のみ / 20分以上のみ）は検索回数が半分で済むため節約になる。
+const DURATIONS: Array<{ value: DurationKey; label: string }> = [
+  { value: 'ショート動画', label: 'ショート動画' },
+  { value: '横長動画', label: '横長動画' },
+  { value: '4-20分', label: '4〜20分のみ' },
+  { value: '20分以上', label: '20分以上のみ' }
+];
 const ORDERS: OrderKey[] = ['視聴回数', '関連度', '新着', '評価'];
 
 export function SearchForm({
@@ -37,9 +51,12 @@ export function SearchForm({
   running,
   hasApiKey,
   quotaUsed,
-  onMissingApiKey
+  onMissingApiKey,
+  onApplyParams
 }: SearchFormProps) {
   const [params, setParams] = useState<SearchParams>(initial);
+  const [presets, setPresets] = useState<SearchPreset[]>(() => getPresets());
+  const [selectedPresetId, setSelectedPresetId] = useState('');
 
   useEffect(() => setParams(initial), [initial]);
 
@@ -52,6 +69,36 @@ export function SearchForm({
 
   function update<K extends keyof SearchParams>(key: K, value: SearchParams[K]) {
     setParams((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleApplyPreset(id: string) {
+    setSelectedPresetId(id);
+    if (!id) return;
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return;
+    // 保存済みのパラメータで現在の検索条件を丸ごと差し替える。
+    setParams(preset.params);
+    onApplyParams(preset.params); // App 側の params state も更新する。
+  }
+
+  function handleSavePreset() {
+    const name = window.prompt('プリセット名を入力してください（同名は上書きされます）');
+    if (name === null) return; // キャンセル
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = savePreset(trimmed, params);
+    setPresets(next);
+    const saved = next.find((p) => p.name === trimmed);
+    if (saved) setSelectedPresetId(saved.id);
+  }
+
+  function handleDeletePreset() {
+    if (!selectedPresetId) return;
+    const target = presets.find((p) => p.id === selectedPresetId);
+    if (target && !window.confirm(`プリセット「${target.name}」を削除しますか？`)) return;
+    const next = deletePreset(selectedPresetId);
+    setPresets(next);
+    setSelectedPresetId('');
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -84,6 +131,36 @@ export function SearchForm({
             disabled={running}
           />
         </div>
+        <div className="md:col-span-2">
+          <label className="label">プリセット</label>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <select
+              className="input flex-1 min-w-[10rem]"
+              value={selectedPresetId}
+              onChange={(e) => handleApplyPreset(e.target.value)}
+              disabled={running}
+            >
+              <option value="">保存済みプリセットを選ぶ…</option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.name}</option>
+              ))}
+            </select>
+            <button type="button" className="btn-secondary" onClick={handleSavePreset} disabled={running}>
+              現在の条件を保存
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleDeletePreset}
+              disabled={running || !selectedPresetId}
+            >
+              削除
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            よく使う検索条件を保存して呼び出せます。選ぶと現在の条件に反映されます（同名は上書き）。
+          </p>
+        </div>
         <div>
           <label className="label">期間</label>
           <select
@@ -98,7 +175,19 @@ export function SearchForm({
           </select>
         </div>
         <div>
-          <label className="label">検索地域</label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="label">検索地域</label>
+            <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={params.regionStrict}
+                onChange={(e) => update('regionStrict', e.target.checked)}
+                disabled={running}
+              />
+              国情報のないチャンネルを除外（厳密）
+            </label>
+          </div>
           <select
             className="input mt-1"
             value={params.regionCode}
@@ -110,7 +199,9 @@ export function SearchForm({
             ))}
           </select>
           <p className="mt-1 text-xs text-slate-500">
-            チャンネル国情報も使って対象地域に近い動画へ絞り込みます。
+            {params.regionStrict
+              ? '※ チャンネルの国情報が対象地域と一致する動画に厳密に絞り込みます。'
+              : 'チャンネル国情報も使って対象地域に近い動画へ絞り込みます（国情報のない動画も残します）。'}
           </p>
         </div>
         <div>
@@ -122,11 +213,27 @@ export function SearchForm({
             disabled={running}
           >
             {DURATIONS.map((d) => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d.value} value={d.value}>{d.label}</option>
             ))}
           </select>
           <p className="mt-1 text-xs text-slate-500">
-            ショート動画は4分未満、横長動画は4分以上を対象にします。
+            ショート動画は4分未満、横長動画は4分以上を対象にします。横長動画は内部で2回検索するため、「4〜20分のみ」「20分以上のみ」を選ぶと検索回数が半分になり消費を節約できます。
+          </p>
+        </div>
+        <div>
+          <label className="label">カテゴリ</label>
+          <select
+            className="input mt-1"
+            value={params.categoryId}
+            onChange={(e) => update('categoryId', e.target.value)}
+            disabled={running}
+          >
+            {VIDEO_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            ※ 日本向けの主要カテゴリで絞り込みます。「すべて」なら絞り込みません。
           </p>
         </div>
         <div>
@@ -239,6 +346,51 @@ export function SearchForm({
           <p className="mt-1 text-xs text-slate-500">
             ※ 判定できないチャンネルは、子ども向け条件を選んだ場合に除外されます。
           </p>
+        </div>
+        <div className="md:col-span-2">
+          <label className="label">検索オプション</label>
+          <div className="mt-1 space-y-2">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={params.titleMustContain}
+                onChange={(e) => update('titleMustContain', e.target.checked)}
+                disabled={running}
+              />
+              タイトルにキーワードを含む動画のみ
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={params.includeLive}
+                onChange={(e) => update('includeLive', e.target.checked)}
+                disabled={running}
+              />
+              ライブ配信・配信予定も含める
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={params.economyMode}
+                onChange={(e) => update('economyMode', e.target.checked)}
+                disabled={running}
+              />
+              候補の水増しを抑えて消費を節約（結果件数は減ることがあります）
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={params.broadSearch}
+                onChange={(e) => update('broadSearch', e.target.checked)}
+                disabled={running}
+              />
+              関連度の高い動画も広く取得（消費が増えます）
+            </label>
+          </div>
         </div>
         <div className="md:col-span-2 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 pt-2">
           <div className="text-xs sm:text-right">

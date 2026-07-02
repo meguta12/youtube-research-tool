@@ -93,8 +93,8 @@ export function HistoryPanel({
                 </tr>
               </thead>
               <tbody>
-                {history.map((h, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
+                {history.map((h) => (
+                  <tr key={`${h.searchedAt}-${h.keyword}`} className="hover:bg-slate-50">
                     <td className="whitespace-nowrap font-mono text-xs">
                       {new Date(h.searchedAt).toLocaleString('ja-JP', {
                         year: 'numeric',

@@ -44,6 +44,32 @@ export function CompetitorAnalysis({ stats, hasData }: CompetitorAnalysisProps) 
         </div>
       </div>
 
+      <div className="card">
+        <div className="card-header">よく使われる2語の組み合わせ TOP15</div>
+        <div className="overflow-x-auto">
+          <table className="table-base">
+            <thead>
+              <tr>
+                <th className="w-16 text-right">順位</th>
+                <th>2語の組み合わせ</th>
+                <th className="text-right">出現回数</th>
+                <th className="text-right">平均再生数</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.topBigrams.map((b, i) => (
+                <tr key={b.phrase} className="hover:bg-slate-50">
+                  <td className="text-right">{i + 1}</td>
+                  <td className="font-medium">{b.phrase}</td>
+                  <td className="text-right">{b.count}回</td>
+                  <td className="text-right">{formatNumber(Math.round(b.averageViews))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DistributionCard
           title="タイトル文字数の分布"
@@ -51,12 +77,12 @@ export function CompetitorAnalysis({ stats, hasData }: CompetitorAnalysisProps) 
           data={stats.titleLengthDistribution}
         />
         <DistributionCard
-          title="投稿曜日の分布"
+          title="投稿曜日の分布（日本時間）"
           labels={['月', '火', '水', '木', '金', '土', '日']}
           data={stats.weekdayDistribution}
         />
         <DistributionCard
-          title="投稿時間帯の分布"
+          title="投稿時間帯の分布（日本時間）"
           labels={['0-6時', '6-12時', '12-18時', '18-24時']}
           data={stats.hourDistribution}
         />

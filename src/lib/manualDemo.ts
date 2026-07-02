@@ -201,6 +201,12 @@ const demoCompetitorStats: CompetitorStats = {
     { word: '会社員', count: 5, averageViews: 73100 },
     { word: '月5万円', count: 4, averageViews: 166000 }
   ],
+  topBigrams: [
+    { phrase: '在宅 ワーク', count: 6, averageViews: 96500 },
+    { phrase: '副業 初心者', count: 5, averageViews: 88200 },
+    { phrase: '会社員 副業', count: 4, averageViews: 79400 },
+    { phrase: '動画 編集', count: 3, averageViews: 84000 }
+  ],
   titleLengthDistribution: {
     '10文字以下': 1,
     '11-20文字': 11,
@@ -241,9 +247,15 @@ export const MANUAL_DEMO_RESULT: ResearchResult = {
     subscriberRange: 'all',
     ignoreSubscriberFilter: false,
     regionCode: 'JP',
+    regionStrict: false,
     channelAge: 'all',
     ignoreChannelAgeFilter: false,
-    kidsFilter: 'all'
+    kidsFilter: 'all',
+    titleMustContain: false,
+    includeLive: false,
+    economyMode: false,
+    categoryId: '',
+    broadSearch: false
   } satisfies SearchParams,
   videos: demoVideos,
   channels: demoChannels,

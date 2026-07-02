@@ -1,5 +1,5 @@
 export type PeriodKey = '今日' | '今週' | '今月' | '3ヶ月' | '全期間';
-export type DurationKey = 'ショート動画' | '横長動画';
+export type DurationKey = 'ショート動画' | '横長動画' | '4-20分' | '20分以上';
 export type OrderKey = '視聴回数' | '関連度' | '新着' | '評価';
 export type SearchRegionCode = 'JP' | 'US' | 'KR' | 'TW' | 'GB' | 'FR' | 'DE';
 export type ChannelAgeKey = 'all' | 'within_6m' | 'within_1y' | 'within_3m' | 'within_1m';
@@ -95,6 +95,33 @@ export function getKidsFilter(key: string): KidsFilter {
   return KIDS_FILTERS.find((r) => r.key === key) || KIDS_FILTERS[0];
 }
 
+export interface VideoCategory {
+  key: string;
+  label: string;
+  id: string; // '' = すべて（絞り込みなし）
+}
+
+// 日本（regionCode=JP）で使える主要カテゴリ。id は YouTube Data API の videoCategoryId。
+export const VIDEO_CATEGORIES: VideoCategory[] = [
+  { key: 'all', label: 'すべて', id: '' },
+  { key: 'film', label: '映画とアニメ', id: '1' },
+  { key: 'music', label: '音楽', id: '10' },
+  { key: 'pets', label: 'ペットと動物', id: '15' },
+  { key: 'sports', label: 'スポーツ', id: '17' },
+  { key: 'gaming', label: 'ゲーム', id: '20' },
+  { key: 'people', label: 'ブログ・人物', id: '22' },
+  { key: 'comedy', label: 'コメディ', id: '23' },
+  { key: 'entertainment', label: 'エンタメ', id: '24' },
+  { key: 'news', label: 'ニュースと政治', id: '25' },
+  { key: 'howto', label: 'ハウツーとスタイル', id: '26' },
+  { key: 'education', label: '教育', id: '27' },
+  { key: 'science', label: '科学と技術', id: '28' }
+];
+
+export function getVideoCategory(id: string): VideoCategory {
+  return VIDEO_CATEGORIES.find((c) => c.id === id) || VIDEO_CATEGORIES[0];
+}
+
 export interface SearchParams {
   keyword: string;
   period: PeriodKey;
@@ -104,9 +131,20 @@ export interface SearchParams {
   subscriberRange: SubscriberRangeKey;
   ignoreSubscriberFilter: boolean;
   regionCode: SearchRegionCode;
+  regionStrict: boolean;
   channelAge: ChannelAgeKey;
   ignoreChannelAgeFilter: boolean;
   kidsFilter: KidsFilterKey;
+  titleMustContain: boolean;
+  includeLive: boolean;
+  economyMode: boolean;
+  categoryId: string;
+  broadSearch: boolean;
+}
+
+/** 検索キーワードの正規化。連続空白を1つにまとめて前後を除去する。 */
+export function normalizeKeyword(keyword: string): string {
+  return String(keyword || '').replace(/\s+/g, ' ').trim();
 }
 
 export function isSubscriberFilterActive(params: Pick<SearchParams, 'ignoreSubscriberFilter' | 'subscriberRange'>): boolean {
@@ -174,6 +212,7 @@ export interface ChannelRow {
 
 export interface CompetitorStats {
   topWords: Array<{ word: string; count: number; averageViews: number }>;
+  topBigrams: Array<{ phrase: string; count: number; averageViews: number }>;
   titleLengthDistribution: Record<string, number>;
   weekdayDistribution: Record<string, number>;
   hourDistribution: Record<string, number>;
@@ -187,6 +226,7 @@ export interface ResearchResult {
   channels: ChannelRow[];
   competitorStats: CompetitorStats;
   estimatedQuota: number;
+  partial?: boolean;
 }
 
 export interface YouTubeSearchItem {
@@ -209,6 +249,7 @@ export interface YouTubeVideoItem {
     publishedAt: string;
     thumbnails: Record<string, { url: string }>;
     tags?: string[];
+    liveBroadcastContent?: 'none' | 'live' | 'upcoming';
   };
   statistics: {
     viewCount?: string;

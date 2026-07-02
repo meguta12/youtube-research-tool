@@ -7,9 +7,11 @@ import {
   getSubscriberRange,
   isChannelAgeFilterActive,
   isSubscriberFilterActive,
+  normalizeKeyword,
   ResearchResult,
   SearchParams,
-  Video
+  Video,
+  YouTubeVideoItem
 } from './types';
 import {
   estimateQuota,
@@ -47,14 +49,53 @@ export function applySubscriberFilter(videos: Video[], rangeKey: SearchParams['s
  * search.list の regionCode は「その国で視聴できる動画」寄りの指定で、
  * 投稿者やチャンネル所在地の厳密な絞り込みではないため、
  * チャンネルの country 情報も使って検索地域に近づける。
+ *
+ * strict=false（既定）: 国一致、または国情報が無い動画は含める。
+ *   （country が空の US/GB/FR/DE 等が全滅する過剰除外を防ぐ）
+ * strict=true: 国一致、または国情報が無い場合はテキストフォールバック一致のみ。
  */
-export function applyRegionFilter(videos: Video[], regionCode: SearchParams['regionCode']): Video[] {
+export function applyRegionFilter(
+  videos: Video[],
+  regionCode: SearchParams['regionCode'],
+  strict = false
+): Video[] {
   const targetRegion = getSearchRegion(regionCode).code;
 
   return videos.filter((v) => {
     const country = String(v.channelCountry || '').toUpperCase();
     if (country) return country === targetRegion;
+    if (!strict) return true;
     return matchesRegionTextFallback(v, targetRegion);
+  });
+}
+
+/**
+ * タイトル必含フィルタ（クライアント側のpost-filter）。
+ * 正規化キーワードを空白で分割し、全トークンがタイトルに含まれる動画のみ残す。
+ * 大文字小文字は無視し、両辺を NFKC 正規化して全角半角の差を吸収する。
+ */
+export function applyTitleMustContainFilter(videos: Video[], keyword: string): Video[] {
+  const tokens = normalizeKeyword(keyword)
+    .split(' ')
+    .map((t) => t.normalize('NFKC').toLowerCase())
+    .filter((t) => t.length > 0);
+  if (tokens.length === 0) return videos;
+
+  return videos.filter((v) => {
+    const title = String(v.title || '').normalize('NFKC').toLowerCase();
+    return tokens.every((token) => title.includes(token));
+  });
+}
+
+/**
+ * ライブ配信・配信予定の除外（クライアント側のpre-filter）。
+ * liveBroadcastContent が 'live' / 'upcoming' の動画を落とす。
+ * 'none' と欠落は残す（配信アーカイブは 'none' なので残る＝正しい）。
+ */
+export function filterOutLiveVideos(items: YouTubeVideoItem[]): YouTubeVideoItem[] {
+  return items.filter((item) => {
+    const state = item.snippet.liveBroadcastContent;
+    return state !== 'live' && state !== 'upcoming';
   });
 }
 
@@ -108,13 +149,14 @@ function matchesRegionTextFallback(video: Video, regionCode: SearchParams['regio
 export async function runResearch(
   params: SearchParams,
   config: AppConfig,
-  onProgress?: (p: ResearchProgress) => void
+  onProgress?: (p: ResearchProgress) => void,
+  signal?: AbortSignal
 ): Promise<ResearchResult> {
   if (!config.apiKey) throw new Error('YouTube APIキーが未設定です。');
   if (!params.keyword.trim()) throw new Error('キーワードを入力してください。');
 
   onProgress?.({ step: 'searching', message: '動画IDを検索中...' });
-  const searchResult = await searchVideoIds(params, config);
+  const searchResult = await searchVideoIds(params, config, signal);
   const ids = searchResult.ids;
   if (ids.length === 0) {
     return {
@@ -124,30 +166,39 @@ export async function runResearch(
       channels: [],
       competitorStats: {
         topWords: [],
+        topBigrams: [],
         titleLengthDistribution: {},
         weekdayDistribution: {},
         hourDistribution: {},
         durationDistribution: {}
       },
-      estimatedQuota: Math.max(1, searchResult.searchCallCount) * 100
+      estimatedQuota: Math.max(1, searchResult.searchCallCount) * 100,
+      // 検索が途中失敗して0件になった場合も部分的だった旨を伝える。
+      partial: searchResult.partial
     };
   }
 
   onProgress?.({ step: 'fetching-videos', message: '動画詳細を取得中...' });
-  let videoItems = await getVideoDetails(ids, config);
+  const videoDetail = await getVideoDetails(ids, config, signal);
+  let videoItems = videoDetail.items;
   videoItems = filterExcludedVideos(videoItems, config);
+  if (!params.includeLive) videoItems = filterOutLiveVideos(videoItems);
 
   onProgress?.({ step: 'fetching-channels', message: 'チャンネル詳細を取得中...' });
   const channelIds = uniqueValues(videoItems.map((item) => item.snippet.channelId));
-  const channelItems = await getChannelDetails(channelIds, config);
+  const channelDetail = await getChannelDetails(channelIds, config, signal);
+  const channelItems = channelDetail.items;
   const channelMap = mapById(channelItems);
 
   onProgress?.({ step: 'analyzing', message: '分析中...' });
   const allVideos = normalizeVideos(videoItems, channelMap);
-  const regionFilteredVideos = applyRegionFilter(allVideos, params.regionCode);
-  const ageFilteredVideos = isChannelAgeFilterActive(params)
-    ? applyChannelAgeFilter(regionFilteredVideos, params.channelAge)
+  const regionFilteredVideos = applyRegionFilter(allVideos, params.regionCode, params.regionStrict);
+  const titleFilteredVideos = params.titleMustContain
+    ? applyTitleMustContainFilter(regionFilteredVideos, params.keyword)
     : regionFilteredVideos;
+  const ageFilteredVideos = isChannelAgeFilterActive(params)
+    ? applyChannelAgeFilter(titleFilteredVideos, params.channelAge)
+    : titleFilteredVideos;
   const kidsFilteredVideos = applyKidsFilter(ageFilteredVideos, params.kidsFilter);
   const subscriberFilteredVideos = isSubscriberFilterActive(params)
     ? applySubscriberFilter(kidsFilteredVideos, params.subscriberRange)
@@ -156,6 +207,8 @@ export async function runResearch(
   const channels = aggregateChannels(videos, channelMap);
   const competitorStats = analyzeTitles(videos, config);
   const quota = estimateQuota(ids.length, channelIds.length, searchResult.searchCallCount);
+  // 検索の部分終了、または動画・チャンネル詳細のchunkスキップがあれば「部分的」とする。
+  const partial = Boolean(searchResult.partial) || videoDetail.partial || channelDetail.partial;
 
   onProgress?.({ step: 'done', message: '完了' });
 
@@ -165,6 +218,7 @@ export async function runResearch(
     videos,
     channels,
     competitorStats,
-    estimatedQuota: quota
+    estimatedQuota: quota,
+    partial
   };
 }

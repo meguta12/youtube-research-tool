@@ -133,6 +133,11 @@ export function VideoList({ videos }: VideoListProps) {
                     {v.title}
                   </a>
                   {v.risingFlag && <span className="ml-1">{v.risingFlag}</span>}
+                  {v.elapsedDays <= 3 && (
+                    <span className="ml-1 align-middle rounded bg-sky-100 px-1 py-0.5 text-[10px] font-medium text-sky-700">
+                      新着
+                    </span>
+                  )}
                 </td>
                 <td className="max-w-xs">
                   <a

@@ -3,6 +3,7 @@ import {
   getSearchRegion,
   isChannelAgeFilterActive,
   isSubscriberFilterActive,
+  normalizeKeyword,
   SearchParams,
   Video,
   YouTubeChannelItem,
@@ -47,58 +48,116 @@ type YouTubeDurationFilter = 'short' | 'medium' | 'long';
 export interface SearchVideoResult {
   ids: string[];
   searchCallCount: number;
+  partial?: boolean;
 }
 
-async function fetchYouTubeApi<T>(endpoint: string, params: Record<string, string | number | undefined | null>): Promise<T> {
+/**
+ * HTTPステータスを持つAPIエラー。4xx/5xx を区別してリトライ要否を判断するために status を保持する。
+ */
+class YouTubeApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'YouTubeApiError';
+    this.status = status;
+  }
+}
+
+// バックオフの待機時間（ネットワーク例外 / 5xx のときのみ使用）。最大2回リトライ。
+const RETRY_DELAYS_MS = [500, 1000];
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException ? err.name === 'AbortError' : (err as any)?.name === 'AbortError';
+}
+
+async function fetchYouTubeApi<T>(
+  endpoint: string,
+  params: Record<string, string | number | undefined | null>,
+  signal?: AbortSignal
+): Promise<T> {
   const url = YOUTUBE_API_BASE + endpoint + '?' + buildQuery(params);
-  const response = await fetch(url, { method: 'GET' });
-  let json: any = {};
-  try {
-    json = await response.json();
-  } catch {
-    /* ignore parse error */
+  // 試行回数 = 初回 + リトライ回数。ネットワーク例外・5xx のときだけ再試行する。
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const response = await fetch(url, { method: 'GET', signal });
+      let json: any = {};
+      try {
+        json = await response.json();
+      } catch {
+        /* ignore parse error */
+      }
+      if (!response.ok || json?.error) {
+        const message = json?.error?.message || `HTTP ${response.status}`;
+        // 4xx（403 quotaExceeded / keyInvalid 等）は回復しないので即throw。5xx はリトライ対象。
+        const err = new YouTubeApiError(`YouTube APIエラー: ${message}`, response.status);
+        if (response.status >= 500 && attempt < RETRY_DELAYS_MS.length) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        throw err;
+      }
+      return json as T;
+    } catch (err) {
+      // 中止は回復対象ではないので即座に投げ直す（項目2）。
+      if (isAbortError(err)) throw err;
+      // 上の分岐で作った 4xx エラーはそのまま投げる（リトライしない）。
+      if (err instanceof YouTubeApiError) throw err;
+      // ここに来るのはネットワーク例外（fetch 失敗）。回数が残っていればリトライ。
+      if (attempt < RETRY_DELAYS_MS.length) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+      throw err;
+    }
   }
-  if (!response.ok || json?.error) {
-    const message = json?.error?.message || `HTTP ${response.status}`;
-    throw new Error(`YouTube APIエラー: ${message}`);
-  }
-  return json as T;
+  // ループは必ず return / throw で抜けるが、型のために保険を置く。
+  throw new Error('YouTube APIエラー: リトライに失敗しました');
 }
 
-export async function testApiKey(apiKey: string): Promise<void> {
+export async function testApiKey(apiKey: string, signal?: AbortSignal): Promise<void> {
   await fetchYouTubeApi('search', {
     part: 'snippet',
     q: 'test',
     type: 'video',
     maxResults: 1,
     key: apiKey
-  });
+  }, signal);
 }
 
-export async function searchVideoIds(params: SearchParams, config: AppConfig): Promise<SearchVideoResult> {
+export async function searchVideoIds(params: SearchParams, config: AppConfig, signal?: AbortSignal): Promise<SearchVideoResult> {
   const ids: string[] = [];
   const seen = new Set<string>();
+  const keyword = normalizeKeyword(params.keyword);
   const candidateLimit = getSearchCandidateLimit(params);
   const durationFilters = getDurationFilters(params.duration);
-  const states = durationFilters.map((duration) => ({
-    duration,
-    pageToken: '',
-    exhausted: false
-  }));
+  // 網羅性UP: broadSearch のときは指定orderに加えて relevance でも取得しIDを統合する。
+  // duration バケットとの掛け算になるため検索回数が増える点に注意（見積りも2倍側に振る）。
+  const orders = getSearchOrders(params);
+  const states = orders.flatMap((order) =>
+    durationFilters.map((duration) => ({
+      order,
+      duration,
+      pageToken: '',
+      exhausted: false
+    }))
+  );
   let searchCallCount = 0;
+  let partial = false;
+  // 検索回数の上限。推定消費（estimateQuotaBeforeRun）と同じ式で、実消費が推定を超えないようにする。
+  const maxSearchCalls = getMaxSearchCalls(params);
 
-  while (ids.length < candidateLimit && states.some((state) => !state.exhausted)) {
+  while (ids.length < candidateLimit && searchCallCount < maxSearchCalls && states.some((state) => !state.exhausted)) {
     for (const state of states) {
-      if (state.exhausted || ids.length >= candidateLimit) continue;
+      if (state.exhausted || ids.length >= candidateLimit || searchCallCount >= maxSearchCalls) continue;
 
       const pageSize = Math.min(50, candidateLimit - ids.length);
       const regionCode = params.regionCode || config.regionCode || 'JP';
       const query: Record<string, string | number | undefined> = {
         part: 'snippet',
         type: 'video',
-        q: params.keyword,
+        q: keyword,
         maxResults: pageSize,
-        order: ORDER_MAP[params.order] || 'viewCount',
+        order: state.order,
         regionCode,
         relevanceLanguage: getRelevanceLanguage(regionCode, config.language),
         key: config.apiKey
@@ -106,13 +165,27 @@ export async function searchVideoIds(params: SearchParams, config: AppConfig): P
 
       const publishedAfter = getPublishedAfter(params.period);
       if (publishedAfter) query.publishedAfter = publishedAfter;
+      // カテゴリ指定（videoCategoryId）は type=video のとき有効。空でないときのみ付与する。
+      if (params.categoryId) query.videoCategoryId = params.categoryId;
       query.videoDuration = state.duration;
       if (state.pageToken) query.pageToken = state.pageToken;
 
-      const response = await fetchYouTubeApi<{ items: YouTubeSearchItem[]; nextPageToken?: string }>(
-        'search',
-        query
-      );
+      let response: { items: YouTubeSearchItem[]; nextPageToken?: string };
+      try {
+        response = await fetchYouTubeApi<{ items: YouTubeSearchItem[]; nextPageToken?: string }>(
+          'search',
+          query,
+          signal
+        );
+      } catch (err) {
+        // 中止はそのまま伝播（呼び出し側で「中止しました」表示にする）。
+        if (isAbortError(err)) throw err;
+        // 1件も取れずに最初のページで失敗したときだけ throw（何が起きたか伝えるため）。
+        if (ids.length === 0) throw err;
+        // それ以外は例外を投げず、集まった ids で部分結果として抜ける。
+        partial = true;
+        return { ids, searchCallCount, partial };
+      }
       searchCallCount += 1;
 
       const pageIds = (response.items || [])
@@ -130,7 +203,7 @@ export async function searchVideoIds(params: SearchParams, config: AppConfig): P
     }
   }
 
-  return { ids, searchCallCount };
+  return { ids, searchCallCount, partial };
 }
 
 export async function searchVideos(params: SearchParams, config: AppConfig): Promise<string[]> {
@@ -138,32 +211,51 @@ export async function searchVideos(params: SearchParams, config: AppConfig): Pro
   return result.ids;
 }
 
-export async function getVideoDetails(ids: string[], config: AppConfig): Promise<YouTubeVideoItem[]> {
-  const items: YouTubeVideoItem[] = [];
-  for (const chunk of chunkArray(ids, 50)) {
-    const response = await fetchYouTubeApi<{ items: YouTubeVideoItem[] }>('videos', {
-      part: 'snippet,statistics,contentDetails,status',
-      id: chunk.join(','),
-      maxResults: 50,
-      key: config.apiKey
-    });
-    items.push(...(response.items || []));
-  }
-  return items;
+export interface DetailFetchResult<T> {
+  items: T[];
+  partial: boolean;
 }
 
-export async function getChannelDetails(ids: string[], config: AppConfig): Promise<YouTubeChannelItem[]> {
-  const items: YouTubeChannelItem[] = [];
-  for (const chunk of chunkArray(uniqueValues(ids), 50)) {
-    const response = await fetchYouTubeApi<{ items: YouTubeChannelItem[] }>('channels', {
-      part: 'snippet,statistics,status',
-      id: chunk.join(','),
-      maxResults: 50,
-      key: config.apiKey
-    });
-    items.push(...(response.items || []));
+export async function getVideoDetails(ids: string[], config: AppConfig, signal?: AbortSignal): Promise<DetailFetchResult<YouTubeVideoItem>> {
+  const items: YouTubeVideoItem[] = [];
+  let partial = false;
+  for (const chunk of chunkArray(ids, 50)) {
+    try {
+      const response = await fetchYouTubeApi<{ items: YouTubeVideoItem[] }>('videos', {
+        part: 'snippet,statistics,contentDetails,status',
+        id: chunk.join(','),
+        maxResults: 50,
+        key: config.apiKey
+      }, signal);
+      items.push(...(response.items || []));
+    } catch (err) {
+      // 中止は伝播。それ以外はそのchunkをスキップして続行し、部分結果として印を付ける。
+      if (isAbortError(err)) throw err;
+      partial = true;
+    }
   }
-  return items;
+  return { items, partial };
+}
+
+export async function getChannelDetails(ids: string[], config: AppConfig, signal?: AbortSignal): Promise<DetailFetchResult<YouTubeChannelItem>> {
+  const items: YouTubeChannelItem[] = [];
+  let partial = false;
+  for (const chunk of chunkArray(uniqueValues(ids), 50)) {
+    try {
+      const response = await fetchYouTubeApi<{ items: YouTubeChannelItem[] }>('channels', {
+        part: 'snippet,statistics,status',
+        id: chunk.join(','),
+        maxResults: 50,
+        key: config.apiKey
+      }, signal);
+      items.push(...(response.items || []));
+    } catch (err) {
+      // 中止は伝播。それ以外はそのchunkをスキップして続行し、部分結果として印を付ける。
+      if (isAbortError(err)) throw err;
+      partial = true;
+    }
+  }
+  return { items, partial };
 }
 
 export function filterExcludedVideos(items: YouTubeVideoItem[], config: AppConfig): YouTubeVideoItem[] {
@@ -209,7 +301,10 @@ export function normalizeVideos(
       const viewsPerDay = viewCount / elapsedDays;
       const subscriberRatio = subscriberCount > 0 ? viewCount / subscriberCount : null;
       // エンゲージメント率 =（高評価＋コメント）÷ 再生数。視聴者の反応の濃さを測る。
-      const engagementRate = viewCount > 0 ? (likeCount + commentCount) / viewCount : null;
+      // 高評価が非公開（likeCount 欠落）のときは分子を過小評価してしまうため算出不能（null）とする。
+      const likeHidden = statistics.likeCount === undefined;
+      const engagementRate =
+        viewCount > 0 && !likeHidden ? (likeCount + commentCount) / viewCount : null;
       const durationSeconds = parseIsoDuration(contentDetails.duration || 'PT0S');
       const videoId = item.id;
       const channelId = snippet.channelId;
@@ -275,10 +370,14 @@ export function estimateQuota(videoCount: number, channelCount: number, searchCa
 
 export function getSearchCandidateLimit(params: SearchParams): number {
   const requested = Math.max(1, Math.min(300, Number(params.maxResults) || 0));
+  // 節約モード: 地域補正・advanced補正による候補の水増しをスキップし、要求件数のみで取得する。
+  if (params.economyMode) return requested;
+
   const hasAdvancedPostFilter =
     isSubscriberFilterActive(params) ||
     isChannelAgeFilterActive(params) ||
-    params.kidsFilter !== 'all';
+    params.kidsFilter !== 'all' ||
+    params.titleMustContain;
 
   if (hasAdvancedPostFilter) return getAdvancedCandidateLimit(requested);
   if (params.regionCode) return getRegionCandidateLimit(requested);
@@ -310,12 +409,35 @@ function getAdvancedCandidateLimit(requested: number): number {
  */
 export function estimateQuotaBeforeRun(params: SearchParams): number {
   const safeMax = getSearchCandidateLimit(params);
-  const searchCalls = Math.ceil(safeMax / 50);
   const videoCalls = Math.ceil(safeMax / 50);
   const channelCalls = Math.ceil(safeMax / 50);
-  const durationCount = getDurationFilters(params.duration || '横長動画').length;
-  const sparseDurationBuffer = durationCount > 1 && safeMax > 50 ? 1 : 0;
-  return (searchCalls + sparseDurationBuffer) * 100 + videoCalls + channelCalls;
+  // search.list は実行側の上限（order数 × durationバケット数 × ceil(候補/50)）と同じ式で見積もる。
+  // 実行側が同じ上限で打ち切るため、推定消費 ≥ 実消費 が常に成り立つ。
+  const searchCalls = getMaxSearchCalls(params);
+  return searchCalls * 100 + videoCalls + channelCalls;
+}
+
+/**
+ * 実行する search.list 呼び出しの上限回数。
+ * order数（broadSearchで2）× durationバケット数（横長で2）× ceil(候補上限 / 50)。
+ * searchVideoIds はこの回数で打ち切るので、estimateQuotaBeforeRun と一致し、
+ * 重複が多くて候補が埋まらないケースでも実消費が推定を超えない。
+ */
+export function getMaxSearchCalls(params: SearchParams): number {
+  const orderCount = getSearchOrders(params).length;
+  const durationCount = getDurationFilters(params.duration).length;
+  return orderCount * durationCount * Math.ceil(getSearchCandidateLimit(params) / 50);
+}
+
+/**
+ * 実行する search の order コード一覧を返す。
+ * 通常は指定order（例: viewCount）1つ。broadSearch のときは relevance も加えて
+ * 網羅性を上げる（既に関連度を選んでいる場合は重複しないよう1つにまとめる）。
+ */
+function getSearchOrders(params: Pick<SearchParams, 'order' | 'broadSearch'>): string[] {
+  const primary = ORDER_MAP[params.order] || 'viewCount';
+  if (!params.broadSearch) return [primary];
+  return primary === 'relevance' ? [primary] : [primary, 'relevance'];
 }
 
 function getDurationFilters(duration: SearchParams['duration'] | string): YouTubeDurationFilter[] {
