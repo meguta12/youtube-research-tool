@@ -1,12 +1,28 @@
-import { CompetitorStats } from '../lib/types';
+import { lazy, Suspense } from 'react';
+import { CompetitorStats, Video } from '../lib/types';
 import { formatNumber } from '../lib/utils';
 
+// グラフ群（recharts 依存）は遅延読み込みして、メインチャンクから切り離す。
+const PostingHeatmap = lazy(() =>
+  import('./charts/PostingHeatmap').then((m) => ({ default: m.PostingHeatmap }))
+);
+const WordBarChart = lazy(() =>
+  import('./charts/WordBarChart').then((m) => ({ default: m.WordBarChart }))
+);
+const TimelineChart = lazy(() =>
+  import('./charts/TimelineChart').then((m) => ({ default: m.TimelineChart }))
+);
+const DistributionBarChart = lazy(() =>
+  import('./charts/DistributionBarChart').then((m) => ({ default: m.DistributionBarChart }))
+);
+
 interface CompetitorAnalysisProps {
+  videos: Video[];
   stats: CompetitorStats;
   hasData: boolean;
 }
 
-export function CompetitorAnalysis({ stats, hasData }: CompetitorAnalysisProps) {
+export function CompetitorAnalysis({ videos, stats, hasData }: CompetitorAnalysisProps) {
   if (!hasData) {
     return (
       <div className="card">
@@ -20,6 +36,11 @@ export function CompetitorAnalysis({ stats, hasData }: CompetitorAnalysisProps) 
     <div className="space-y-6">
       <div className="card">
         <div className="card-header">タイトル頻出ワード TOP20</div>
+        <div className="card-body">
+          <Suspense fallback={<ChartLoading />}>
+            <WordBarChart words={stats.topWords} />
+          </Suspense>
+        </div>
         <div className="overflow-x-auto">
           <table className="table-base">
             <thead>
@@ -70,63 +91,51 @@ export function CompetitorAnalysis({ stats, hasData }: CompetitorAnalysisProps) 
         </div>
       </div>
 
+      <div className="card">
+        <div className="card-header">投稿の曜日×時間帯マップ（日本時間）</div>
+        <Suspense fallback={<ChartLoading />}>
+          <PostingHeatmap matrix={stats.weekdayHourMatrix} />
+        </Suspense>
+      </div>
+
+      <div className="card">
+        <div className="card-header">このジャンルの鮮度（最近の動画が伸びているか）</div>
+        <div className="card-body">
+          <Suspense fallback={<ChartLoading />}>
+            <TimelineChart videos={videos} />
+          </Suspense>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DistributionCard
-          title="タイトル文字数の分布"
-          labels={['10文字以下', '11-20文字', '21-30文字', '31文字以上']}
-          data={stats.titleLengthDistribution}
-        />
-        <DistributionCard
-          title="投稿曜日の分布（日本時間）"
-          labels={['月', '火', '水', '木', '金', '土', '日']}
-          data={stats.weekdayDistribution}
-        />
-        <DistributionCard
-          title="投稿時間帯の分布（日本時間）"
-          labels={['0-6時', '6-12時', '12-18時', '18-24時']}
-          data={stats.hourDistribution}
-        />
-        <DistributionCard
-          title="動画尺の分布"
-          labels={['4分未満', '4-10分', '10-20分', '20分以上']}
-          data={stats.durationDistribution}
-        />
+        <div className="card">
+          <div className="card-header">タイトル文字数の分布</div>
+          <Suspense fallback={<ChartLoading />}>
+            <DistributionBarChart
+              labels={['10文字以下', '11-20文字', '21-30文字', '31文字以上']}
+              data={stats.titleLengthDistribution}
+            />
+          </Suspense>
+        </div>
+        <div className="card">
+          <div className="card-header">動画尺の分布</div>
+          <Suspense fallback={<ChartLoading />}>
+            <DistributionBarChart
+              labels={['4分未満', '4-10分', '10-20分', '20分以上']}
+              data={stats.durationDistribution}
+            />
+          </Suspense>
+        </div>
       </div>
     </div>
   );
 }
 
-function DistributionCard({
-  title,
-  labels,
-  data
-}: {
-  title: string;
-  labels: string[];
-  data: Record<string, number>;
-}) {
-  const maxCount = Math.max(1, ...labels.map((l) => data[l] || 0));
+// グラフ遅延読み込み中の小さなフォールバック。
+function ChartLoading() {
   return (
-    <div className="card">
-      <div className="card-header">{title}</div>
-      <div className="card-body space-y-2">
-        {labels.map((label) => {
-          const count = data[label] || 0;
-          const pct = (count / maxCount) * 100;
-          return (
-            <div key={label} className="flex items-center gap-3 text-sm">
-              <span className="w-20 shrink-0 text-slate-600">{label}</span>
-              <div className="flex-1 h-3 rounded bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-brand-500"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="w-12 text-right tabular-nums text-slate-700">{count}本</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex h-[220px] items-center justify-center text-sm text-slate-400">
+      グラフを読み込み中…
     </div>
   );
 }

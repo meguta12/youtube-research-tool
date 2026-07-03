@@ -21,7 +21,9 @@ const KEYS = {
   license: 'yt-research:license',
   onboarded: 'yt-research:onboarded',
   quota: 'yt-research:quota',
-  presets: 'yt-research:presets'
+  presets: 'yt-research:presets',
+  myChannel: 'yt-research:my-channel',
+  myChannelSnapshots: 'yt-research:my-channel-snapshots'
 };
 
 export const DAILY_QUOTA_LIMIT = 10000;
@@ -306,7 +308,9 @@ const BACKUP_KEYS: string[] = [
   KEYS.license,
   KEYS.onboarded,
   KEYS.quota,
-  KEYS.presets
+  KEYS.presets,
+  KEYS.myChannel,
+  KEYS.myChannelSnapshots
 ];
 
 interface BackupFile {
@@ -417,6 +421,88 @@ export function deletePreset(id: string): SearchPreset[] {
   const list = getPresets().filter((p) => p.id !== id);
   safeWrite(KEYS.presets, list);
   return list;
+}
+
+// ---- マイチャンネル分析（入力の保存・成長記録スナップショット） ----
+
+export interface MyChannelInput {
+  input: string; // 最後に入力したチャンネル入力文字列
+  maxVideos: number; // 選択した取得本数
+}
+
+const DEFAULT_MY_CHANNEL_INPUT: MyChannelInput = { input: '', maxVideos: 300 };
+
+export function getMyChannelInput(): MyChannelInput {
+  const stored = safeRead<Partial<MyChannelInput>>(KEYS.myChannel, {});
+  return {
+    input: typeof stored.input === 'string' ? stored.input : DEFAULT_MY_CHANNEL_INPUT.input,
+    maxVideos: Number(stored.maxVideos) || DEFAULT_MY_CHANNEL_INPUT.maxVideos
+  };
+}
+
+export function saveMyChannelInput(value: MyChannelInput): void {
+  safeWrite(KEYS.myChannel, value);
+}
+
+// 成長記録の1点。dateKey は日本時間の 'YYYY-MM-DD'（1日1点）。
+export interface Snapshot {
+  dateKey: string;
+  subscriberCount: number;
+  totalViewCount: number;
+  videoCount: number;
+}
+
+// チャンネルごとに保持するスナップショットの上限（古いものから破棄）。
+const MAX_SNAPSHOTS_PER_CHANNEL = 365;
+
+interface StoredSnapshots {
+  byChannel: Record<string, Snapshot[]>;
+}
+
+/**
+ * スナップショットの日付キー（日本時間の 'YYYY-MM-DD'）。
+ * クォータの太平洋日付（currentQuotaDateKey）とは別物なので流用しない。
+ * 日本はサマータイムがないため Asia/Tokyo 固定で問題ない。en-CA は既定で 'YYYY-MM-DD' 形式。
+ */
+const TOKYO_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
+export function currentTokyoDateKey(now: Date = new Date()): string {
+  return TOKYO_DATE_FORMAT.format(now);
+}
+
+function readStoredSnapshots(): StoredSnapshots {
+  const data = safeRead<StoredSnapshots>(KEYS.myChannelSnapshots, { byChannel: {} });
+  return { byChannel: data.byChannel || {} };
+}
+
+/**
+ * チャンネルの成長記録を1点追加する。
+ * 同じ日付キーは上書き（1日1点）。日付昇順に保ち、365点を超えたら古いものから破棄する。
+ */
+export function recordChannelSnapshot(
+  channelId: string,
+  snapshot: Snapshot
+): void {
+  if (!channelId) return;
+  const data = readStoredSnapshots();
+  const list = (data.byChannel[channelId] || []).filter((s) => s.dateKey !== snapshot.dateKey);
+  list.push(snapshot);
+  list.sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
+  // 上限超過分は先頭（古い側）から破棄する。
+  data.byChannel[channelId] = list.slice(Math.max(0, list.length - MAX_SNAPSHOTS_PER_CHANNEL));
+  safeWrite(KEYS.myChannelSnapshots, data);
+}
+
+// 指定チャンネルのスナップショット（日付昇順）。
+export function getChannelSnapshots(channelId: string): Snapshot[] {
+  if (!channelId) return [];
+  const data = readStoredSnapshots();
+  return (data.byChannel[channelId] || []).slice();
 }
 
 export type { ResearchResult };

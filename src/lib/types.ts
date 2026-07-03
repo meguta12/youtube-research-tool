@@ -183,6 +183,7 @@ export interface Video {
   viewsPerDay: number;
   subscriberRatio: number | null;
   outlierMultiplier: number | null;
+  heatScore: number | null;
   duration: string;
   durationSeconds: number;
   tags: string;
@@ -217,6 +218,8 @@ export interface CompetitorStats {
   weekdayDistribution: Record<string, number>;
   hourDistribution: Record<string, number>;
   durationDistribution: Record<string, number>;
+  // 曜日×時間帯のジョイント分布（7行=月〜日, 4列=0-6/6-12/12-18/18-24時, 値=本数, JST基準）。
+  weekdayHourMatrix: number[][];
 }
 
 export interface ResearchResult {

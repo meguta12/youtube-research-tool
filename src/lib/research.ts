@@ -1,4 +1,5 @@
 import { aggregateChannels, analyzeTitles } from './analyzer';
+import { applyHeatScores } from './heat';
 import {
   AppConfig,
   getChannelAgeFilter,
@@ -170,7 +171,8 @@ export async function runResearch(
         titleLengthDistribution: {},
         weekdayDistribution: {},
         hourDistribution: {},
-        durationDistribution: {}
+        durationDistribution: {},
+        weekdayHourMatrix: []
       },
       estimatedQuota: Math.max(1, searchResult.searchCallCount) * 100,
       // 検索が途中失敗して0件になった場合も部分的だった旨を伝える。
@@ -204,6 +206,8 @@ export async function runResearch(
     ? applySubscriberFilter(kidsFilteredVideos, params.subscriberRange)
     : kidsFilteredVideos;
   const videos = subscriberFilteredVideos.slice(0, params.maxResults);
+  // ヒートスコアは表示セット内の相対評価なので、必ず post-filter・slice後の最終セットで計算する。
+  applyHeatScores(videos);
   const channels = aggregateChannels(videos, channelMap);
   const competitorStats = analyzeTitles(videos, config);
   const quota = estimateQuota(ids.length, channelIds.length, searchResult.searchCallCount);

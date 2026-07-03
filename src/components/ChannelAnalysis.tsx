@@ -41,7 +41,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
             {channels.map((c) => (
               <tr
                 key={c.channelId}
-                className={c.isOpportunity ? 'bg-emerald-50 hover:bg-emerald-100' : 'hover:bg-slate-50'}
+                className={c.isOpportunity ? 'bg-emerald-50 hover:bg-emerald-100' : 'odd:bg-slate-50/50 hover:bg-slate-50'}
               >
                 <td>
                   <a

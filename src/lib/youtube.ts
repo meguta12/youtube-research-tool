@@ -70,7 +70,7 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException ? err.name === 'AbortError' : (err as any)?.name === 'AbortError';
 }
 
-async function fetchYouTubeApi<T>(
+export async function fetchYouTubeApi<T>(
   endpoint: string,
   params: Record<string, string | number | undefined | null>,
   signal?: AbortSignal
@@ -329,6 +329,7 @@ export function normalizeVideos(
         viewsPerDay,
         subscriberRatio,
         outlierMultiplier: null, // チャンネル別の中央値を後段で計算してから埋める
+        heatScore: null, // 最終表示セット内の相対評価なので research 側で埋める
         duration: formatDuration(durationSeconds),
         durationSeconds,
         tags: (snippet.tags || []).join(', '),

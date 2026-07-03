@@ -134,10 +134,19 @@ export function HomePanel({
             <AiAnalysisButton result={result} />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat label="取得件数" value={`${result.videos.length}件`} />
-            <Stat label="チャンネル数" value={`${result.channels.length}件`} />
-            <Stat label="最高再生数" value={formatNumber(result.videos[0]?.viewCount || 0)} />
-            <Stat label="消費ユニット(目安)" value={`約${result.estimatedQuota}`} />
+            <Stat
+              label="取得件数"
+              value={`${result.videos.length}件`}
+              icon="📹"
+              chip={
+                trendComparison?.hasPrev
+                  ? `新規ランクイン ${trendComparison.newVideoCount}本`
+                  : undefined
+              }
+            />
+            <Stat label="チャンネル数" value={`${result.channels.length}件`} icon="📺" />
+            <Stat label="最高再生数" value={formatNumber(result.videos[0]?.viewCount || 0)} icon="🔥" />
+            <Stat label="消費ユニット(目安)" value={`約${result.estimatedQuota}`} icon="⚡" />
           </div>
           {trendComparison && <TrendComparePanel comparison={trendComparison} />}
         </div>
@@ -220,12 +229,18 @@ function TrendComparePanel({ comparison }: { comparison: TrendComparison }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon, chip }: { label: string; value: string; icon?: string; chip?: string }) {
   return (
     <div className="card">
       <div className="card-body">
-        <div className="text-xs text-slate-500">{label}</div>
-        <div className="mt-1 text-xl font-semibold text-slate-800">{value}</div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          {icon && <span aria-hidden="true">{icon}</span>}
+          <span>{label}</span>
+        </div>
+        <div className="mt-1 text-2xl font-bold text-slate-800">{value}</div>
+        {chip && (
+          <span className="mt-1.5 inline-flex badge bg-heat-50 text-heat-600">{chip}</span>
+        )}
       </div>
     </div>
   );

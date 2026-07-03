@@ -11,6 +11,7 @@ import { LicenseGate } from './components/LicenseGate';
 import { Modal } from './components/Modal';
 import { HelpPanel } from './components/HelpPanel';
 import { HistoryPanel } from './components/HistoryPanel';
+import { MyChannelPanel } from './components/MyChannelPanel';
 import { ChangelogContent } from './components/UpdateBanner';
 import { isLicenseRequired, validateLicense } from './lib/license';
 import {
@@ -23,6 +24,7 @@ import {
   getHistory,
   getLastParams,
   getLicense,
+  getMyChannelInput,
   getQuotaHistory,
   getQuotaUsage,
   HistoryEntry,
@@ -45,13 +47,15 @@ import {
   getManualDemoMode,
   MANUAL_DEMO_CONFIG,
   MANUAL_DEMO_HISTORY,
+  MANUAL_DEMO_MY_CHANNEL,
+  MANUAL_DEMO_MY_CHANNEL_SNAPSHOTS,
   MANUAL_DEMO_PROGRESS,
   MANUAL_DEMO_QUOTA,
   MANUAL_DEMO_QUOTA_DAYS,
   MANUAL_DEMO_RESULT
 } from './lib/manualDemo';
 
-type ViewKey = 'home' | 'videos' | 'channels' | 'competitors' | 'thumbnails' | 'history';
+type ViewKey = 'home' | 'videos' | 'channels' | 'competitors' | 'thumbnails' | 'mychannel' | 'history';
 
 // マルチキーワード連続リサーチの1回あたり上限。過剰なクォータ消費を防ぐ。
 const MAX_MULTI_KEYWORDS = 20;
@@ -64,7 +68,7 @@ export interface MultiProgress {
 }
 
 const demoMode = getManualDemoMode();
-const demoMainViews: ViewKey[] = ['home', 'videos', 'channels', 'competitors', 'thumbnails', 'history'];
+const demoMainViews: ViewKey[] = ['home', 'videos', 'channels', 'competitors', 'thumbnails', 'mychannel', 'history'];
 const isManualMainDemo = Boolean(demoMode && demoMainViews.includes(demoMode as ViewKey));
 const isManualProgressDemo = demoMode === 'progress';
 
@@ -254,6 +258,13 @@ export function App() {
     abortControllerRef.current?.abort();
   }
 
+  // マイチャンネル分析の消費ユニットを加算し、使用量stateを更新する（履歴には積まない）。
+  function handleMyChannelQuotaUsed(amount: number) {
+    addQuotaUsage(amount);
+    setQuota(getQuotaUsage());
+    setQuotaDays(getQuotaHistory(7));
+  }
+
   const hasResult = Boolean(result && result.videos.length > 0);
   // 前回同一キーワード結果とのトレンド比較。result か history が変わったときだけ再計算する。
   const trendComparison = useMemo(
@@ -369,6 +380,7 @@ export function App() {
         {view === 'channels' && <ChannelAnalysis channels={result?.channels ?? []} />}
         {view === 'competitors' && (
           <CompetitorAnalysis
+            videos={result?.videos ?? []}
             stats={
               result?.competitorStats ?? {
                 topWords: [],
@@ -376,13 +388,27 @@ export function App() {
                 titleLengthDistribution: {},
                 weekdayDistribution: {},
                 hourDistribution: {},
-                durationDistribution: {}
+                durationDistribution: {},
+                weekdayHourMatrix: []
               }
             }
             hasData={competitorHasData}
           />
         )}
         {view === 'thumbnails' && <ThumbnailGallery videos={result?.videos ?? []} />}
+        {view === 'mychannel' && (
+          <MyChannelPanel
+            config={config}
+            researchResult={result}
+            hasApiKey={Boolean(config.apiKey)}
+            onMissingApiKey={() => setShowSettings(true)}
+            onQuotaUsed={handleMyChannelQuotaUsed}
+            demoData={isManualMainDemo && demoMode === 'mychannel' ? MANUAL_DEMO_MY_CHANNEL : undefined}
+            demoSnapshots={isManualMainDemo && demoMode === 'mychannel' ? MANUAL_DEMO_MY_CHANNEL_SNAPSHOTS : undefined}
+            initialInput={isManualMainDemo || isManualProgressDemo ? '' : getMyChannelInput().input}
+            initialMaxVideos={isManualMainDemo || isManualProgressDemo ? 300 : getMyChannelInput().maxVideos}
+          />
+        )}
       </Layout>
 
       <Modal open={showSettings} title="設定" onClose={() => setShowSettings(false)}>

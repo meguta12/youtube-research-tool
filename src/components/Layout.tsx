@@ -14,6 +14,7 @@ const NAV_ITEMS: Array<{ key: string; label: string }> = [
   { key: 'channels', label: 'チャンネル分析' },
   { key: 'competitors', label: '競合分析' },
   { key: 'thumbnails', label: 'サムネ一覧' },
+  { key: 'mychannel', label: 'マイチャンネル' },
   { key: 'history', label: '履歴・使用量' }
 ];
 
@@ -59,6 +60,7 @@ export function Layout({ current, onNavigate, onOpenSettings, onOpenHelp, childr
             ))}
           </div>
         </div>
+        <div className="h-0.5 bg-gradient-to-r from-brand-500 to-heat-500" />
       </header>
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-6">{children}</div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { copyText } from '../lib/clipboard';
 import {
   getChannelAgeFilter,
   getKidsFilter,
@@ -46,10 +47,11 @@ export function buildAiAnalysisText(result: ResearchResult): string {
 
   // 上位動画（最大20件）。1行1動画。
   lines.push(`■ 上位動画（最大${MAX_VIDEOS}件）`);
-  lines.push('タイトル | 再生数 | 1日平均 | 登録者比 | 倍率 | エンゲージ率 | 公開日 | チャンネル');
+  lines.push('タイトル | ヒート | 再生数 | 1日平均 | 登録者比 | 倍率 | エンゲージ率 | 公開日 | チャンネル');
   result.videos.slice(0, MAX_VIDEOS).forEach((v) => {
     const cells = [
       v.title,
+      v.heatScore !== null ? `ヒート${Math.round(v.heatScore)}` : '-',
       formatNumber(v.viewCount),
       formatNumber(Math.round(v.viewsPerDay)),
       v.subscriberRatio !== null ? `${v.subscriberRatio.toFixed(2)}倍` : '-',
@@ -105,19 +107,7 @@ export function AiAnalysisButton({ result }: AiAnalysisButtonProps) {
 
   async function handleCopy() {
     const text = buildAiAnalysisText(result);
-    let success: boolean;
-    try {
-      // 安全なコンテキスト（https/localhost）では Clipboard API を使う。
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        success = true;
-      } else {
-        success = fallbackCopy(text);
-      }
-    } catch {
-      // Clipboard API が拒否された場合はテキストエリア選択方式にフォールバック。
-      success = fallbackCopy(text);
-    }
+    const success = await copyText(text);
     if (success) {
       setState('copied');
       // 成功メッセージだけ数秒後に消す。失敗メッセージは残す。
@@ -138,24 +128,4 @@ export function AiAnalysisButton({ result }: AiAnalysisButtonProps) {
       )}
     </div>
   );
-}
-
-// テキストエリア選択方式のフォールバック。Clipboard API が使えない環境向け。
-function fallbackCopy(text: string): boolean {
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    // 画面外に置いてスクロール位置を乱さない。
-    textarea.style.position = 'fixed';
-    textarea.style.top = '-9999px';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return ok;
-  } catch {
-    return false;
-  }
 }

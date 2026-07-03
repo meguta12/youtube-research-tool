@@ -106,8 +106,27 @@ export function analyzeTitles(videos: Video[], config: AppConfig): CompetitorSta
     titleLengthDistribution: countByBuckets(videos, getTitleLengthBucket),
     weekdayDistribution: countByBuckets(videos, getWeekdayBucket),
     hourDistribution: countByBuckets(videos, getHourBucket),
-    durationDistribution: countByBuckets(videos, getDurationBucket)
+    durationDistribution: countByBuckets(videos, getDurationBucket),
+    weekdayHourMatrix: buildWeekdayHourMatrix(videos)
   };
+}
+
+/**
+ * 曜日×時間帯のジョイント分布行列（JST基準）。
+ * 行=月〜日（7行, 表示ラベルと同じ月始まり）、列=0-6/6-12/12-18/18-24時（4列）。値=本数。
+ * 既存の曜日/時間帯バケットと同じ JST 変換・境界を流用するため、
+ * 行の和・列の和はそれぞれ weekdayDistribution・hourDistribution と一致する。
+ */
+function buildWeekdayHourMatrix(videos: Video[]): number[][] {
+  // 月=0 ... 日=6 に写像する（getUTCDay は 0=日 なので (day + 6) % 7）。
+  const matrix: number[][] = Array.from({ length: 7 }, () => [0, 0, 0, 0]);
+  videos.forEach((video) => {
+    const jst = toJst(video.publishedAt);
+    const rowIndex = (jst.getUTCDay() + 6) % 7;
+    const columnIndex = Math.min(3, Math.floor(jst.getUTCHours() / 6));
+    matrix[rowIndex][columnIndex] += 1;
+  });
+  return matrix;
 }
 
 /**

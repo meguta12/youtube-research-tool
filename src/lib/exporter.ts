@@ -28,6 +28,7 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
     '1日平均再生数': Math.round(v.viewsPerDay),
     登録者比: v.subscriberRatio !== null ? Number(v.subscriberRatio.toFixed(2)) : '',
     アウトライアー倍率: v.outlierMultiplier !== null ? Number(v.outlierMultiplier.toFixed(2)) : '',
+    ヒートスコア: v.heatScore !== null ? Math.round(v.heatScore) : '',
     動画尺: v.duration,
     動画URL: v.videoUrl,
     チャンネルURL: v.channelUrl,
@@ -91,7 +92,7 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
 
 export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-videos.csv'): void {
   const rows = [
-    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', 'エンゲージメント率(%)', '公開日', '1日平均再生数', '登録者比', 'アウトライアー倍率', '動画尺', '動画URL', 'チャンネルURL']
+    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', 'エンゲージメント率(%)', '公開日', '1日平均再生数', '登録者比', 'アウトライアー倍率', 'ヒートスコア', '動画尺', '動画URL', 'チャンネルURL']
   ];
   result.videos.forEach((v) => {
     rows.push([
@@ -108,6 +109,7 @@ export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-
       String(Math.round(v.viewsPerDay)),
       v.subscriberRatio !== null ? v.subscriberRatio.toFixed(2) : '',
       v.outlierMultiplier !== null ? v.outlierMultiplier.toFixed(2) : '',
+      v.heatScore !== null ? String(Math.round(v.heatScore)) : '',
       v.duration,
       v.videoUrl,
       v.channelUrl

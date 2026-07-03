@@ -32,7 +32,7 @@ body {
     @apply block text-sm font-medium text-slate-700;
   }
   .card {
-    @apply rounded-lg border border-slate-200 bg-white shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md;
   }
   .card-header {
     @apply border-b border-slate-200 px-5 py-3 font-semibold text-slate-700;

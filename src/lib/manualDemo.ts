@@ -1,5 +1,7 @@
+import { applyHeatScores } from './heat';
+import { MyChannelData } from './myChannel';
 import { ResearchProgress } from './research';
-import { HistoryEntry, QuotaDailyRecord, QuotaState } from './storage';
+import { HistoryEntry, QuotaDailyRecord, QuotaState, Snapshot } from './storage';
 import { AppConfig, ChannelRow, CompetitorStats, ResearchResult, SearchParams, Video } from './types';
 
 export type ManualDemoMode =
@@ -10,7 +12,8 @@ export type ManualDemoMode =
   | 'channels'
   | 'competitors'
   | 'thumbnails'
-  | 'history';
+  | 'history'
+  | 'mychannel';
 
 const SVG_TEMPLATE = (title: string, accent: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -45,6 +48,7 @@ const demoVideos: Video[] = [
     viewsPerDay: 17714,
     subscriberRatio: 3.02,
     outlierMultiplier: 1.45,
+    heatScore: null,
     duration: '12:44',
     durationSeconds: 764,
     tags: '副業, 在宅ワーク, お金',
@@ -73,6 +77,7 @@ const demoVideos: Video[] = [
     viewsPerDay: 14750,
     subscriberRatio: 2.88,
     outlierMultiplier: null,
+    heatScore: null,
     duration: '8:21',
     durationSeconds: 501,
     tags: '在宅ワーク, 初心者, 副業',
@@ -101,6 +106,7 @@ const demoVideos: Video[] = [
     viewsPerDay: 3760,
     subscriberRatio: 1.15,
     outlierMultiplier: 0.55,
+    heatScore: null,
     duration: '16:18',
     durationSeconds: 978,
     tags: '副業, 失敗, 会社員',
@@ -129,6 +135,7 @@ const demoVideos: Video[] = [
     viewsPerDay: 4889,
     subscriberRatio: 0.7,
     outlierMultiplier: null,
+    heatScore: null,
     duration: '21:05',
     durationSeconds: 1265,
     tags: '動画編集, 副業, フリーランス',
@@ -138,6 +145,9 @@ const demoVideos: Video[] = [
     risingFlag: ''
   }
 ];
+
+// デモの heatScore は本番と同じ式で埋める（手書きの値にしないことで式とのドリフトを防ぐ）。
+applyHeatScores(demoVideos);
 
 const demoChannels: ChannelRow[] = [
   {
@@ -233,7 +243,18 @@ const demoCompetitorStats: CompetitorStats = {
     '4-10分': 14,
     '10-20分': 23,
     '20分以上': 11
-  }
+  },
+  // 行=月〜日 / 列=0-6/6-12/12-18/18-24時。行の和は weekdayDistribution、
+  // 列の和は hourDistribution と一致させてある（辻褄合わせ済み）。
+  weekdayHourMatrix: [
+    [0, 1, 2, 1], // 月 = 4
+    [0, 1, 3, 2], // 火 = 6
+    [1, 1, 3, 3], // 水 = 8
+    [0, 1, 2, 2], // 木 = 5
+    [0, 2, 3, 2], // 金 = 7
+    [0, 2, 4, 4], // 土 = 10
+    [0, 1, 4, 5]  // 日 = 10
+  ]
 };
 
 export const MANUAL_DEMO_RESULT: ResearchResult = {
@@ -313,6 +334,216 @@ export const MANUAL_DEMO_PROGRESS: ResearchProgress = {
   message: '③チャンネル詳細を取得中...'
 };
 
+// ---- マイチャンネル分析デモ（?demo=mychannel） ----
+
+// 自分のチャンネル1件分の動画6本。全て同一チャンネル（demo-my-channel）に属する。
+const demoMyVideos: Video[] = [
+  {
+    videoId: 'demo-my-01',
+    channelId: 'demo-my-channel',
+    title: '【伸びた動画】初心者がまず見るべき副業ロードマップ完全版',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 82000,
+    likeCount: 2100,
+    commentCount: 180,
+    engagementRate: 0.0278,
+    publishedAt: '2026-04-12T19:00:00.000Z',
+    publishedDate: '2026-04-12',
+    elapsedDays: 16,
+    viewsPerDay: 5125,
+    subscriberRatio: 6.61,
+    outlierMultiplier: 3.42,
+    heatScore: null,
+    duration: '14:20',
+    durationSeconds: 860,
+    tags: '副業, 初心者, ロードマップ',
+    thumbnailUrl: SVG_TEMPLATE('副業ロードマップ', '#2563eb'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-01',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: '🔥'
+  },
+  {
+    videoId: 'demo-my-02',
+    channelId: 'demo-my-channel',
+    title: '在宅ワークで月10万円までの現実的な手順を全部話します',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 41000,
+    likeCount: 880,
+    commentCount: 92,
+    engagementRate: 0.0237,
+    publishedAt: '2026-04-05T20:00:00.000Z',
+    publishedDate: '2026-04-05',
+    elapsedDays: 23,
+    viewsPerDay: 1783,
+    subscriberRatio: 3.31,
+    outlierMultiplier: 1.71,
+    heatScore: null,
+    duration: '11:45',
+    durationSeconds: 705,
+    tags: '在宅ワーク, 副業, 月10万円',
+    thumbnailUrl: SVG_TEMPLATE('在宅で月10万円', '#059669'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-02',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: '🔥'
+  },
+  {
+    videoId: 'demo-my-03',
+    channelId: 'demo-my-channel',
+    title: '会社員が副業でやりがちな失敗トップ5と回避法',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 23500,
+    likeCount: 410,
+    commentCount: 51,
+    engagementRate: 0.0196,
+    publishedAt: '2026-03-28T18:00:00.000Z',
+    publishedDate: '2026-03-28',
+    elapsedDays: 31,
+    viewsPerDay: 758,
+    subscriberRatio: 1.9,
+    outlierMultiplier: 0.98,
+    heatScore: null,
+    duration: '9:32',
+    durationSeconds: 572,
+    tags: '会社員, 副業, 失敗',
+    thumbnailUrl: SVG_TEMPLATE('副業の失敗5選', '#7c3aed'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-03',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: '🔥'
+  },
+  {
+    videoId: 'demo-my-04',
+    channelId: 'demo-my-channel',
+    title: 'ブログ副業は2026年でも稼げるのか正直に検証した',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 18800,
+    likeCount: 300,
+    commentCount: 40,
+    engagementRate: 0.0181,
+    publishedAt: '2026-03-15T12:00:00.000Z',
+    publishedDate: '2026-03-15',
+    elapsedDays: 44,
+    viewsPerDay: 427,
+    subscriberRatio: 1.52,
+    outlierMultiplier: 0.78,
+    heatScore: null,
+    duration: '13:08',
+    durationSeconds: 788,
+    tags: 'ブログ, 副業, 検証',
+    thumbnailUrl: SVG_TEMPLATE('ブログ副業の今', '#ea580c'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-04',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: '🔥'
+  },
+  {
+    videoId: 'demo-my-05',
+    channelId: 'demo-my-channel',
+    title: '動画編集の副業を3ヶ月やってみた結果を全公開',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 12100,
+    likeCount: 160,
+    commentCount: 22,
+    engagementRate: 0.015,
+    publishedAt: '2026-02-28T21:00:00.000Z',
+    publishedDate: '2026-02-28',
+    elapsedDays: 59,
+    viewsPerDay: 205,
+    subscriberRatio: 0.98,
+    outlierMultiplier: 0.5,
+    heatScore: null,
+    duration: '16:44',
+    durationSeconds: 1004,
+    tags: '動画編集, 副業, 実践',
+    thumbnailUrl: SVG_TEMPLATE('動画編集3ヶ月', '#0891b2'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-05',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: ''
+  },
+  {
+    videoId: 'demo-my-06',
+    channelId: 'demo-my-channel',
+    title: '副業初心者が最初の1円を稼ぐまでにやったこと',
+    channelTitle: 'めぐペン副業ラボ',
+    channelCountry: 'JP',
+    channelMadeForKids: false,
+    subscriberCount: 12400,
+    channelVideoCount: 48,
+    channelPublishedAt: '2024-09-01T00:00:00.000Z',
+    viewCount: 7600,
+    likeCount: 95,
+    commentCount: 14,
+    engagementRate: 0.0143,
+    publishedAt: '2026-02-10T17:00:00.000Z',
+    publishedDate: '2026-02-10',
+    elapsedDays: 77,
+    viewsPerDay: 99,
+    subscriberRatio: 0.61,
+    outlierMultiplier: 0.32,
+    heatScore: null,
+    duration: '8:12',
+    durationSeconds: 492,
+    tags: '副業, 初心者, 最初の1円',
+    thumbnailUrl: SVG_TEMPLATE('最初の1円', '#be123c'),
+    videoUrl: 'https://www.youtube.com/watch?v=demo-my-06',
+    channelUrl: 'https://www.youtube.com/channel/demo-my-channel',
+    risingFlag: ''
+  }
+];
+
+// デモの heatScore は本番と同じ式で埋める（手書きの値にしないことで式とのドリフトを防ぐ）。
+applyHeatScores(demoMyVideos);
+
+export const MANUAL_DEMO_MY_CHANNEL: MyChannelData = {
+  channel: {
+    id: 'demo-my-channel',
+    title: 'めぐペン副業ラボ',
+    thumbnailUrl: SVG_TEMPLATE('めぐペン副業ラボ', '#1a73e8'),
+    subscriberCount: 12400,
+    totalViewCount: 1840000,
+    videoCount: 48,
+    publishedAt: '2024-09-01T00:00:00.000Z'
+  },
+  videos: demoMyVideos,
+  partial: false,
+  fetchedVideoCount: demoMyVideos.length,
+  estimatedQuota: 13
+};
+
+// 成長記録7日分（日本時間の 'YYYY-MM-DD'・日付昇順・登録者数が右肩上がり）。
+export const MANUAL_DEMO_MY_CHANNEL_SNAPSHOTS: Snapshot[] = [
+  { dateKey: '2026-04-22', subscriberCount: 11200, totalViewCount: 1698000, videoCount: 45 },
+  { dateKey: '2026-04-23', subscriberCount: 11400, totalViewCount: 1715000, videoCount: 45 },
+  { dateKey: '2026-04-24', subscriberCount: 11650, totalViewCount: 1732000, videoCount: 46 },
+  { dateKey: '2026-04-25', subscriberCount: 11800, totalViewCount: 1758000, videoCount: 46 },
+  { dateKey: '2026-04-26', subscriberCount: 12000, totalViewCount: 1786000, videoCount: 47 },
+  { dateKey: '2026-04-27', subscriberCount: 12200, totalViewCount: 1812000, videoCount: 47 },
+  { dateKey: '2026-04-28', subscriberCount: 12400, totalViewCount: 1840000, videoCount: 48 }
+];
+
 export function getManualDemoMode(): ManualDemoMode | null {
   if (typeof window === 'undefined') return null;
   const raw = new URLSearchParams(window.location.search).get('demo');
@@ -324,7 +555,8 @@ export function getManualDemoMode(): ManualDemoMode | null {
     'channels',
     'competitors',
     'thumbnails',
-    'history'
+    'history',
+    'mychannel'
   ];
   return allowed.includes(raw as ManualDemoMode) ? (raw as ManualDemoMode) : null;
 }
