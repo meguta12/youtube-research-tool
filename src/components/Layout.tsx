@@ -22,7 +22,7 @@ export function Layout({ current, onNavigate, onOpenSettings, onOpenHelp, childr
   return (
     <div className="min-h-full flex flex-col">
       <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 font-semibold">
             <span className="inline-block h-6 w-6 rounded bg-brand-500 text-center text-xs leading-6">▶</span>
             <span>YouTubeリサーチツール</span>
@@ -63,10 +63,10 @@ export function Layout({ current, onNavigate, onOpenSettings, onOpenHelp, childr
         <div className="h-0.5 bg-gradient-to-r from-brand-500 to-heat-500" />
       </header>
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-6">{children}</div>
+        <div className="mx-auto max-w-[1600px] px-4 py-6">{children}</div>
       </main>
       <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-2 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>YouTube Data API v3 を使用しています。APIキーはご利用者ご自身のブラウザのみに保存されます。</span>
           <span className="flex items-center gap-3 whitespace-nowrap">
             <span className="text-slate-400">制作者：めぐペン</span>

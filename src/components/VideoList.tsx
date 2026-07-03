@@ -116,10 +116,10 @@ export function VideoList({ videos }: VideoListProps) {
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="table-base">
+          <table className="table-base table-wide">
             <thead>
               <tr>
-                <th className="w-32">サムネ</th>
+                <th className="w-32 min-w-[128px]">サムネ</th>
                 <th>タイトル</th>
                 <th>チャンネル</th>
                 <th>国</th>
@@ -144,7 +144,7 @@ export function VideoList({ videos }: VideoListProps) {
                   tier === 'S' ? 'bg-amber-50 hover:bg-amber-100' : 'odd:bg-slate-50/50 hover:bg-slate-50';
                 return (
                   <tr key={v.videoId} className={rowClass}>
-                    <td className="overflow-visible">
+                    <td className="min-w-[128px] overflow-visible">
                       {v.thumbnailUrl && (
                         <a href={v.videoUrl} target="_blank" rel="noreferrer">
                           <img

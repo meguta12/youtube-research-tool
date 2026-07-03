@@ -19,7 +19,7 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
     <div className="card">
       <div className="card-header">チャンネル分析（{channels.length}件）</div>
       <div className="overflow-x-auto">
-        <table className="table-base">
+        <table className="table-base table-wide-md">
           <thead>
             <tr>
               <th>チャンネル名</th>

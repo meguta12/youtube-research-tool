@@ -49,6 +49,14 @@ body {
   .table-base tbody td {
     @apply px-3 py-2 border-b border-slate-100 align-middle;
   }
+  /* 列数が多い表（動画リスト等）専用。auto layout による列の圧縮（サムネ潰れ等）を防ぐ最小幅。
+     幅が足りない画面では親の overflow-x-auto が横スクロールを担う。 */
+  .table-wide {
+    @apply min-w-[1400px];
+  }
+  .table-wide-md {
+    @apply min-w-[1100px];
+  }
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }
