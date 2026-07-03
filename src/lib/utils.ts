@@ -144,6 +144,14 @@ export function truncateText(value: string, maxLength: number): string {
   return `${text.slice(0, maxLength)}...`;
 }
 
+// ファイル名に使えない文字を除去する（CSV/xlsx/画像と同じくブラウザ完結でダウンロードするため）。
+export function sanitizeFilename(value: string): string {
+  return String(value || '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
+}
+
 export function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }

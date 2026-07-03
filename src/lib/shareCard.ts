@@ -1,4 +1,5 @@
 import { normalizeKeyword, ResearchResult, Video } from './types';
+import { sanitizeFilename } from './utils';
 
 /**
  * X（Twitter）投稿用の「SNSシェア画像カード」を生成する。
@@ -393,14 +394,6 @@ export function buildShareCaption(result: ResearchResult): string {
 // キーワードをハッシュタグ化する。空白と記号を除去して連結（# は付けない）。
 function toHashtag(keyword: string): string {
   return keyword.replace(/[\s#　]+/g, '');
-}
-
-// ファイル名に使えない文字を除去する（CSV/xlsx と同じくブラウザ完結でダウンロードするため）。
-function sanitizeFilename(value: string): string {
-  return String(value || '')
-    .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, '_')
-    .trim();
 }
 
 /**

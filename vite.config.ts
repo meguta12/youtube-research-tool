@@ -16,6 +16,7 @@ export default defineConfig({
         // xlsx はエクスポート時のみ、recharts（＋引きずられる d3 系）はグラフ表示時のみ必要。
         manualChunks: (id) => {
           if (id.includes('node_modules/xlsx')) return 'xlsx';
+          if (id.includes('node_modules/jszip')) return 'jszip';
           if (
             id.includes('node_modules/recharts') ||
             id.includes('node_modules/d3-') ||
