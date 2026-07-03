@@ -86,6 +86,16 @@ export function Layout({ current, onNavigate, onOpenSettings, onOpenHelp, childr
             >
               note
             </a>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-400">関連ページ：</span>
+            <a
+              href="https://kanpake.app/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-500 hover:text-brand-600"
+            >
+              カンパケ
+            </a>
           </span>
         </div>
       </footer>
