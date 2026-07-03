@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getHeatTier } from '../lib/heat';
 import { Video } from '../lib/types';
 import { formatNumber, truncateText } from '../lib/utils';
 import { downloadThumbnails } from '../lib/thumbnailDownload';
@@ -8,14 +9,26 @@ interface ThumbnailGalleryProps {
 }
 
 type DownloadState = 'idle' | 'downloading' | 'done';
+type SortKey = 'viewCount' | 'heatScore';
+
+const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
+  { key: 'viewCount', label: '再生数' },
+  { key: 'heatScore', label: 'ヒートスコア' }
+];
 
 export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
   // 選択中の videoId 集合。検索結果が変わったらリセットする。
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
   const [resultMessage, setResultMessage] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('viewCount');
 
-  const sorted = useMemo(() => [...videos].sort((a, b) => b.viewCount - a.viewCount), [videos]);
+  const sorted = useMemo(() => {
+    return [...videos].sort((a, b) => {
+      if (sortKey === 'heatScore') return (b.heatScore ?? -1) - (a.heatScore ?? -1);
+      return b.viewCount - a.viewCount;
+    });
+  }, [videos, sortKey]);
 
   // videos（検索結果）が変わったら選択と完了メッセージをリセットする。
   useEffect(() => {
@@ -87,8 +100,17 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
   return (
     <div className="card">
       <div className="card-header flex flex-wrap items-center justify-between gap-2">
-        <span>サムネ一覧（再生数順）</span>
+        <span>サムネ一覧</span>
         <div className="flex flex-wrap items-center gap-2 text-sm font-normal">
+          <select
+            className="input w-40"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>並び順: {opt.label}</option>
+            ))}
+          </select>
           <button type="button" className="btn-secondary" onClick={toggleAll}>
             {selected.size > 0 ? '選択解除' : 'すべて選択'}
           </button>
@@ -131,6 +153,11 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
                     <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
                       {v.duration}
                     </span>
+                    {v.heatScore !== null && (
+                      <span className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-heat-500">
+                        {formatHeatBadge(v.heatScore)}
+                      </span>
+                    )}
                   </a>
                   {/* チェックボックスはリンク遷移を発火させないよう独立して配置する。 */}
                   <label
@@ -160,4 +187,11 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
       </div>
     </div>
   );
+}
+
+// サムネカード右上のヒートバッジ。VideoList の🔥表記ルールに合わせる。
+function formatHeatBadge(score: number): string {
+  const tier = getHeatTier(score);
+  const fire = tier === 'S' ? '🔥🔥🔥' : tier === 'A' ? '🔥🔥' : tier === 'B' ? '🔥' : '';
+  return `${Math.round(score)}${fire}`;
 }
