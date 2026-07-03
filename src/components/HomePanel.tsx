@@ -5,6 +5,7 @@ import { TrendComparison } from '../lib/trend';
 import { ResearchResult, SearchParams } from '../lib/types';
 import { formatDateTime, formatNumber } from '../lib/utils';
 import { AiAnalysisButton } from './AiAnalysisButton';
+import { ShareCardButton } from './ShareCardButton';
 import { MultiKeywordSection } from './MultiKeywordSection';
 import { QuotaCard } from './QuotaCard';
 import { SearchForm } from './SearchForm';
@@ -131,7 +132,10 @@ export function HomePanel({
             <div className="text-sm text-slate-500">
               キーワード「<span className="font-semibold text-slate-800">{result.params.keyword}</span>」の結果
             </div>
-            <AiAnalysisButton result={result} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ShareCardButton result={result} />
+              <AiAnalysisButton result={result} />
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Stat

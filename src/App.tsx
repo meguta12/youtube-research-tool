@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Layout } from './components/Layout';
 import { HomePanel } from './components/HomePanel';
 import { VideoList } from './components/VideoList';
+import { ShareCardButton } from './components/ShareCardButton';
 import { ChannelAnalysis } from './components/ChannelAnalysis';
 import { CompetitorAnalysis } from './components/CompetitorAnalysis';
 import { ThumbnailGallery } from './components/ThumbnailGallery';
@@ -314,7 +315,8 @@ export function App() {
             <div className="text-sm text-slate-500">
               キーワード「<span className="font-semibold text-slate-800">{result?.params.keyword}</span>」の結果
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {result && <ShareCardButton result={result} />}
               <button
                 className="btn-secondary"
                 onClick={() => result && downloadVideosAsCsv(result)}
