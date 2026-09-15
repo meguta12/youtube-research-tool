@@ -6,8 +6,10 @@ import {
   getSubscriberRange,
   isChannelAgeFilterActive,
   isSubscriberFilterActive,
-  ResearchResult
+  ResearchResult,
+  Video
 } from './types';
+import { StockedVideo } from './storage';
 import { formatNumber } from './utils';
 
 export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtube-research.xlsx'): void {
@@ -90,31 +92,32 @@ export function downloadResultsAsExcel(result: ResearchResult, filename = 'youtu
   XLSX.writeFile(workbook, filename);
 }
 
-export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-videos.csv'): void {
-  const rows = [
-    ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', 'エンゲージメント率(%)', '公開日', '1日平均再生数', '登録者比', 'アウトライアー倍率', 'ヒートスコア', '動画尺', '動画URL', 'チャンネルURL']
+const VIDEO_CSV_HEADER = ['タイトル', 'チャンネル名', 'チャンネル国', '子ども向け', '登録者数', '再生数', '高評価数', 'コメント数', 'エンゲージメント率(%)', '公開日', '1日平均再生数', '登録者比', 'アウトライアー倍率', 'ヒートスコア', '動画尺', '動画URL', 'チャンネルURL'];
+
+function buildVideoCsvRow(v: Video): string[] {
+  return [
+    v.title,
+    v.channelTitle,
+    v.channelCountry || '',
+    formatMadeForKids(v.channelMadeForKids),
+    String(v.subscriberCount),
+    String(v.viewCount),
+    String(v.likeCount),
+    String(v.commentCount),
+    v.engagementRate !== null ? (v.engagementRate * 100).toFixed(2) : '',
+    v.publishedDate,
+    String(Math.round(v.viewsPerDay)),
+    v.subscriberRatio !== null ? v.subscriberRatio.toFixed(2) : '',
+    v.outlierMultiplier !== null ? v.outlierMultiplier.toFixed(2) : '',
+    v.heatScore !== null ? String(Math.round(v.heatScore)) : '',
+    v.duration,
+    v.videoUrl,
+    v.channelUrl
   ];
-  result.videos.forEach((v) => {
-    rows.push([
-      v.title,
-      v.channelTitle,
-      v.channelCountry || '',
-      formatMadeForKids(v.channelMadeForKids),
-      String(v.subscriberCount),
-      String(v.viewCount),
-      String(v.likeCount),
-      String(v.commentCount),
-      v.engagementRate !== null ? (v.engagementRate * 100).toFixed(2) : '',
-      v.publishedDate,
-      String(Math.round(v.viewsPerDay)),
-      v.subscriberRatio !== null ? v.subscriberRatio.toFixed(2) : '',
-      v.outlierMultiplier !== null ? v.outlierMultiplier.toFixed(2) : '',
-      v.heatScore !== null ? String(Math.round(v.heatScore)) : '',
-      v.duration,
-      v.videoUrl,
-      v.channelUrl
-    ]);
-  });
+}
+
+// Excel で文字化けしないよう BOM 付き UTF-8 で書き出す。
+function triggerCsvDownload(rows: string[][], filename: string): void {
   const csv = rows
     .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\r\n');
@@ -127,6 +130,23 @@ export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function downloadVideosAsCsv(result: ResearchResult, filename = 'youtube-videos.csv'): void {
+  const rows = [VIDEO_CSV_HEADER];
+  result.videos.forEach((v) => {
+    rows.push(buildVideoCsvRow(v));
+  });
+  triggerCsvDownload(rows, filename);
+}
+
+// ストック一覧の CSV。動画列の前に「どのキーワードで保存したか」とメモを付ける。
+export function downloadStocksAsCsv(stocks: StockedVideo[], filename = 'youtube-stocks.csv'): void {
+  const rows = [['キーワード', 'ストック日時', 'メモ', ...VIDEO_CSV_HEADER]];
+  stocks.forEach((s) => {
+    rows.push([s.keyword, new Date(s.stockedAt).toLocaleString('ja-JP'), s.memo, ...buildVideoCsvRow(s.video)]);
+  });
+  triggerCsvDownload(rows, filename);
 }
 
 function formatMadeForKids(value: boolean | null): string {

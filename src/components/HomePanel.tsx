@@ -10,6 +10,7 @@ import { MultiKeywordSection } from './MultiKeywordSection';
 import { QuotaCard } from './QuotaCard';
 import { SearchForm } from './SearchForm';
 import { UpdateBanner } from './UpdateBanner';
+import { IconFlame, IconStop, IconTv, IconVideo, IconZap } from './icons';
 
 interface HomePanelProps {
   initial: SearchParams;
@@ -51,9 +52,8 @@ export function HomePanel({
   onApplyParams
 }: HomePanelProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <UpdateBanner onOpenChangelog={onOpenChangelog} />
-      <QuotaCard used={quota.used} searchCount={quota.searchCount} />
 
       <SearchForm
         initial={initial}
@@ -65,63 +65,31 @@ export function HomePanel({
         onApplyParams={onApplyParams}
       />
 
-      <MultiKeywordSection
-        baseParams={initial}
-        onRunMulti={onRunMulti}
-        running={running}
-        hasApiKey={hasApiKey}
-        maxKeywords={maxMultiKeywords}
-        onMissingApiKey={onMissingApiKey}
-      />
-
       {running && progress && (
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="inline-block h-3 w-3 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-sm text-slate-700">{progress.message}</span>
-              </div>
-              <button type="button" className="btn-secondary" onClick={onCancel}>
-                中止
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProgressCard message={progress.message} onCancel={onCancel} />
       )}
 
       {running && multiProgress && (
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="inline-block h-3 w-3 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-sm text-slate-700">
-                  {multiProgress.index}/{multiProgress.total} 件目：「{multiProgress.keyword}」を検索中…
-                </span>
-              </div>
-              <button type="button" className="btn-secondary" onClick={onCancel}>
-                中止
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProgressCard
+          message={`${multiProgress.index}/${multiProgress.total} 件目：「${multiProgress.keyword}」を検索中…`}
+          onCancel={onCancel}
+        />
       )}
 
       {cancelledNotice && !running && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           {cancelledNotice}
         </div>
       )}
 
       {errorMessage && !running && (
-        <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           <strong>エラー：</strong> {errorMessage}
         </div>
       )}
 
       {result?.partial === true && !running && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           一部の取得が完了しませんでした。表示中のデータは部分的です（APIの一時的なエラーの可能性）。もう一度実行すると全件取得できることがあります。
         </div>
       )}
@@ -131,32 +99,66 @@ export function HomePanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm text-slate-500">
               キーワード「<span className="font-semibold text-slate-800">{result.params.keyword}</span>」の結果
+              <span className="ml-2 text-xs text-slate-400">{formatDateTime(new Date(result.searchedAt))}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ShareCardButton result={result} />
               <AiAnalysisButton result={result} />
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat
               label="取得件数"
               value={`${result.videos.length}件`}
-              icon="📹"
+              icon={<IconVideo size={15} />}
+              tone="bg-brand-50 text-brand-600"
               chip={
                 trendComparison?.hasPrev
                   ? `新規ランクイン ${trendComparison.newVideoCount}本`
                   : undefined
               }
             />
-            <Stat label="チャンネル数" value={`${result.channels.length}件`} icon="📺" />
-            <Stat label="最高再生数" value={formatNumber(result.videos[0]?.viewCount || 0)} icon="🔥" />
-            <Stat label="消費ユニット(目安)" value={`約${result.estimatedQuota}`} icon="⚡" />
+            <Stat label="チャンネル数" value={`${result.channels.length}件`} icon={<IconTv size={15} />} tone="bg-violet-50 text-violet-600" />
+            <Stat label="最高再生数" value={formatNumber(result.videos[0]?.viewCount || 0)} icon={<IconFlame size={15} />} tone="bg-heat-50 text-heat-600" />
+            <Stat label="消費ユニット(目安)" value={`約${result.estimatedQuota}`} icon={<IconZap size={15} />} tone="bg-emerald-50 text-emerald-600" />
           </div>
           {trendComparison && <TrendComparePanel comparison={trendComparison} />}
         </div>
       )}
 
+      <MultiKeywordSection
+        baseParams={initial}
+        onRunMulti={onRunMulti}
+        running={running}
+        hasApiKey={hasApiKey}
+        maxKeywords={maxMultiKeywords}
+        onMissingApiKey={onMissingApiKey}
+      />
+
+      <QuotaCard used={quota.used} searchCount={quota.searchCount} />
+
       <CreatorCredit />
+    </div>
+  );
+}
+
+// 実行中の進捗表示（単発・マルチ共通）。
+function ProgressCard({ message, onCancel }: { message: string; onCancel: () => void }) {
+  return (
+    <div className="card border-brand-100">
+      <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-brand-500" />
+          </span>
+          <span className="text-sm text-slate-700">{message}</span>
+        </div>
+        <button type="button" className="btn-secondary" onClick={onCancel}>
+          <IconStop size={14} />
+          中止
+        </button>
+      </div>
     </div>
   );
 }
@@ -233,15 +235,27 @@ function TrendComparePanel({ comparison }: { comparison: TrendComparison }) {
   );
 }
 
-function Stat({ label, value, icon, chip }: { label: string; value: string; icon?: string; chip?: string }) {
+function Stat({
+  label,
+  value,
+  icon,
+  tone,
+  chip
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  tone: string;
+  chip?: string;
+}) {
   return (
     <div className="card">
       <div className="card-body">
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          {icon && <span aria-hidden="true">{icon}</span>}
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span className={`section-icon ${tone}`}>{icon}</span>
           <span>{label}</span>
         </div>
-        <div className="mt-1 text-2xl font-bold text-slate-800">{value}</div>
+        <div className="mt-2 text-2xl font-bold tabular-nums text-slate-800">{value}</div>
         {chip && (
           <span className="mt-1.5 inline-flex badge bg-heat-50 text-heat-600">{chip}</span>
         )}

@@ -1,5 +1,6 @@
 import { ChannelRow } from '../lib/types';
 import { formatNumber } from '../lib/utils';
+import { IconUsers } from './icons';
 
 interface ChannelAnalysisProps {
   channels: ChannelRow[];
@@ -17,7 +18,13 @@ export function ChannelAnalysis({ channels }: ChannelAnalysisProps) {
   }
   return (
     <div className="card">
-      <div className="card-header">チャンネル分析（{channels.length}件）</div>
+      <div className="card-header">
+        <span className="section-icon bg-slate-100 text-slate-600">
+          <IconUsers size={15} />
+        </span>
+        <span>チャンネル分析</span>
+        <span className="badge bg-slate-100 text-slate-600">{channels.length}件</span>
+      </div>
       <div className="overflow-x-auto">
         <table className="table-base table-wide-md">
           <thead>

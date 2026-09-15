@@ -1,5 +1,6 @@
 import { DAILY_QUOTA_LIMIT, HistoryEntry, QuotaDailyRecord } from '../lib/storage';
 import { formatNumber } from '../lib/utils';
+import { IconClock, IconZap } from './icons';
 
 interface HistoryPanelProps {
   history: HistoryEntry[];
@@ -20,7 +21,12 @@ export function HistoryPanel({
     <div className="space-y-6">
       <div className="card">
         <div className="card-header flex items-center justify-between">
-          <span>過去7日間のAPI使用状況（推定）</span>
+          <span className="flex items-center gap-2">
+            <span className="section-icon bg-emerald-50 text-emerald-600">
+              <IconZap size={15} />
+            </span>
+            過去7日間のAPI使用状況（推定）
+          </span>
           <button
             type="button"
             className="text-xs text-slate-500 hover:text-rose-600"
@@ -65,7 +71,12 @@ export function HistoryPanel({
 
       <div className="card">
         <div className="card-header flex items-center justify-between">
-          <span>検索履歴（最大50件）</span>
+          <span className="flex items-center gap-2">
+            <span className="section-icon bg-slate-100 text-slate-600">
+              <IconClock size={15} />
+            </span>
+            検索履歴（最大50件）
+          </span>
           <button
             type="button"
             className="text-xs text-slate-500 hover:text-rose-600"

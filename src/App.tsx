@@ -12,11 +12,16 @@ import { LicenseGate } from './components/LicenseGate';
 import { Modal } from './components/Modal';
 import { HelpPanel } from './components/HelpPanel';
 import { HistoryPanel } from './components/HistoryPanel';
+import { StockPanel } from './components/StockPanel';
+import { IconBookmark, IconDownload, IconSearch, IconSheet } from './components/icons';
 import { MyChannelPanel } from './components/MyChannelPanel';
 import { ChangelogContent } from './components/UpdateBanner';
 import { isLicenseRequired, validateLicense } from './lib/license';
 import {
   addQuotaUsage,
+  addStock,
+  buildStockId,
+  buildStockKeyword,
   clearApiKey,
   clearHistory,
   clearQuotaHistory,
@@ -28,21 +33,27 @@ import {
   getMyChannelInput,
   getQuotaHistory,
   getQuotaUsage,
+  getStocks,
   HistoryEntry,
   isOnboarded,
   markOnboarded,
   pushHistory,
   QuotaDailyRecord,
   QuotaState,
+  removeStock,
+  removeStocksByKeyword,
   saveConfig,
   saveLastParams,
   setApiKey,
-  setLicense
+  setLicense,
+  StockedVideo,
+  updateStockMemo
 } from './lib/storage';
 import { runResearch, ResearchProgress } from './lib/research';
 import { buildTrendSnapshot, compareWithPrevious } from './lib/trend';
 import { estimateQuotaBeforeRun } from './lib/youtube';
-import { AppConfig, normalizeKeyword, ResearchResult, SearchParams } from './lib/types';
+import { AppConfig, normalizeKeyword, ResearchResult, SearchParams, Video } from './lib/types';
+import { formatDateTime } from './lib/utils';
 import { downloadResultsAsExcel, downloadVideosAsCsv } from './lib/exporter';
 import {
   getManualDemoMode,
@@ -56,7 +67,7 @@ import {
   MANUAL_DEMO_RESULT
 } from './lib/manualDemo';
 
-type ViewKey = 'home' | 'videos' | 'channels' | 'competitors' | 'thumbnails' | 'mychannel' | 'history';
+type ViewKey = 'home' | 'videos' | 'channels' | 'competitors' | 'thumbnails' | 'stocks' | 'mychannel' | 'history';
 
 // マルチキーワード連続リサーチの1回あたり上限。過剰なクォータ消費を防ぐ。
 const MAX_MULTI_KEYWORDS = 20;
@@ -68,8 +79,15 @@ export interface MultiProgress {
   keyword: string;
 }
 
+// 画面右下に数秒だけ出す通知（ストック追加時など）。任意で1つだけアクションボタンを持てる。
+interface ToastState {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
 const demoMode = getManualDemoMode();
-const demoMainViews: ViewKey[] = ['home', 'videos', 'channels', 'competitors', 'thumbnails', 'mychannel', 'history'];
+const demoMainViews: ViewKey[] = ['home', 'videos', 'channels', 'competitors', 'thumbnails', 'stocks', 'mychannel', 'history'];
 const isManualMainDemo = Boolean(demoMode && demoMainViews.includes(demoMode as ViewKey));
 const isManualProgressDemo = demoMode === 'progress';
 
@@ -108,9 +126,49 @@ export function App() {
   const [quota, setQuota] = useState<QuotaState>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA : getQuotaUsage()));
   const [history, setHistory] = useState<HistoryEntry[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_HISTORY : getHistory()));
   const [quotaDays, setQuotaDays] = useState<QuotaDailyRecord[]>(() => (isManualMainDemo || isManualProgressDemo ? MANUAL_DEMO_QUOTA_DAYS : getQuotaHistory(7)));
+  // ストックはデモモードでも実際の localStorage を使う（保存操作そのものを試せるようにするため）。
+  const [stocks, setStocks] = useState<StockedVideo[]>(() => getStocks());
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   // 実行中のリクエストを中止するための AbortController と、二重実行を防ぐ再入ガード。
   const abortControllerRef = useRef<AbortController | null>(null);
   const runningRef = useRef(false);
+
+  function showToast(next: ToastState) {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    setToast(next);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3200);
+  }
+
+  // 表示中の結果のキーワードでストック済みの videoId 集合。リスト側のしおり表示に使う。
+  const stockedVideoIds = useMemo(() => {
+    if (!result) return new Set<string>();
+    const keyword = buildStockKeyword(result.params.keyword);
+    return new Set(stocks.filter((s) => s.keyword === keyword).map((s) => s.videoId));
+  }, [stocks, result]);
+
+  // 表示中の検索キーワードをグループ名としてストックを付け外しする。
+  function handleToggleStock(video: Video) {
+    if (!result) return;
+    const keyword = buildStockKeyword(result.params.keyword);
+    const id = buildStockId(video.videoId, keyword);
+    if (stocks.some((s) => s.id === id)) {
+      setStocks(removeStock(id));
+      showToast({ message: 'ストックから外しました' });
+      return;
+    }
+    const ok = addStock(video, keyword, result.searchedAt);
+    if (!ok) {
+      showToast({ message: '保存できませんでした。ブラウザの保存容量がいっぱいの可能性があります。' });
+      return;
+    }
+    setStocks(getStocks());
+    showToast({
+      message: `「${keyword}」にストックしました`,
+      actionLabel: 'ストックを見る',
+      onAction: () => setView('stocks')
+    });
+  }
 
   function handleSaveApiKey(apiKey: string): boolean {
     const ok = setApiKey(apiKey);
@@ -309,25 +367,40 @@ export function App() {
         onNavigate={(k) => setView(k as ViewKey)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenHelp={() => setShowHelp(true)}
+        quotaUsed={quota.used}
+        stockCount={stocks.length}
       >
-        {view !== 'home' && view !== 'history' && hasResult && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm text-slate-500">
-              キーワード「<span className="font-semibold text-slate-800">{result?.params.keyword}</span>」の結果
+        {view !== 'home' && view !== 'history' && view !== 'stocks' && hasResult && result && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="section-icon bg-brand-50 text-brand-600">
+                <IconSearch size={15} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm text-slate-500">
+                  キーワード「<span className="font-semibold text-slate-800">{result.params.keyword}</span>」の結果
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 text-[11px] text-slate-400">
+                  <span>{result.videos.length}件</span>
+                  <span>{formatDateTime(new Date(result.searchedAt))}</span>
+                  {stockedVideoIds.size > 0 && (
+                    <button type="button" className="inline-flex items-center gap-1 text-brand-600 hover:underline" onClick={() => setView('stocks')}>
+                      <IconBookmark size={11} filled />
+                      ストック {stockedVideoIds.size}件
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {result && <ShareCardButton result={result} />}
-              <button
-                className="btn-secondary"
-                onClick={() => result && downloadVideosAsCsv(result)}
-              >
+              <ShareCardButton result={result} />
+              <button className="btn-secondary" onClick={() => downloadVideosAsCsv(result)}>
+                <IconSheet size={15} />
                 CSV
               </button>
-              <button
-                className="btn-primary"
-                onClick={() => result && downloadResultsAsExcel(result)}
-              >
-                ⬇ Excelダウンロード
+              <button className="btn-primary" onClick={() => downloadResultsAsExcel(result)}>
+                <IconDownload size={15} />
+                Excelダウンロード
               </button>
             </div>
           </div>
@@ -378,7 +451,24 @@ export function App() {
             }}
           />
         )}
-        {view === 'videos' && <VideoList videos={result?.videos ?? []} />}
+        {view === 'stocks' && (
+          <StockPanel
+            stocks={stocks}
+            onRemove={(id) => setStocks(removeStock(id))}
+            onRemoveGroup={(keyword) => setStocks(removeStocksByKeyword(keyword))}
+            onUpdateMemo={(id, memo) => setStocks(updateStockMemo(id, memo))}
+            onRerun={(keyword) => {
+              const next = { ...params, keyword };
+              setParams(next);
+              saveLastParams(next);
+              setView('home');
+            }}
+            onGoHome={() => setView('home')}
+          />
+        )}
+        {view === 'videos' && (
+          <VideoList videos={result?.videos ?? []} stockedIds={stockedVideoIds} onToggleStock={handleToggleStock} />
+        )}
         {view === 'channels' && <ChannelAnalysis channels={result?.channels ?? []} />}
         {view === 'competitors' && (
           <CompetitorAnalysis
@@ -397,7 +487,9 @@ export function App() {
             hasData={competitorHasData}
           />
         )}
-        {view === 'thumbnails' && <ThumbnailGallery videos={result?.videos ?? []} />}
+        {view === 'thumbnails' && (
+          <ThumbnailGallery videos={result?.videos ?? []} stockedIds={stockedVideoIds} onToggleStock={handleToggleStock} />
+        )}
         {view === 'mychannel' && (
           <MyChannelPanel
             config={config}
@@ -429,6 +521,27 @@ export function App() {
       <Modal open={showChangelog} title="アップデート履歴" onClose={() => setShowChangelog(false)}>
         <ChangelogContent />
       </Modal>
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4 sm:justify-end sm:pr-6">
+          <div className="toast" role="status" aria-live="polite">
+            <IconBookmark size={16} className="shrink-0 text-brand-100" filled />
+            <span>{toast.message}</span>
+            {toast.actionLabel && toast.onAction && (
+              <button
+                type="button"
+                className="rounded-md bg-white/15 px-2 py-1 text-xs font-semibold hover:bg-white/25"
+                onClick={() => {
+                  toast.onAction?.();
+                  setToast(null);
+                }}
+              >
+                {toast.actionLabel}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

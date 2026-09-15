@@ -3,9 +3,14 @@ import { getHeatTier } from '../lib/heat';
 import { Video } from '../lib/types';
 import { formatNumber, truncateText } from '../lib/utils';
 import { downloadThumbnails } from '../lib/thumbnailDownload';
+import { StockButton } from './StockButton';
+import { IconDownload, IconImage } from './icons';
 
 interface ThumbnailGalleryProps {
   videos: Video[];
+  // 表示中のキーワードでストック済みの videoId 集合と、しおりの付け外し。
+  stockedIds: Set<string>;
+  onToggleStock: (video: Video) => void;
 }
 
 type DownloadState = 'idle' | 'downloading' | 'done';
@@ -16,7 +21,7 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: 'heatScore', label: 'ヒートスコア' }
 ];
 
-export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
+export function ThumbnailGallery({ videos, stockedIds, onToggleStock }: ThumbnailGalleryProps) {
   // 選択中の videoId 集合。検索結果が変わったらリセットする。
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
@@ -100,7 +105,13 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
   return (
     <div className="card">
       <div className="card-header flex flex-wrap items-center justify-between gap-2">
-        <span>サムネ一覧</span>
+        <div className="flex items-center gap-2">
+          <span className="section-icon bg-slate-100 text-slate-600">
+            <IconImage size={15} />
+          </span>
+          <span>サムネ一覧</span>
+          <span className="badge bg-slate-100 text-slate-600">{videos.length}件</span>
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-sm font-normal">
           <select
             className="input w-40"
@@ -121,6 +132,7 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
             onClick={handleDownload}
             disabled={selected.size === 0 || downloading}
           >
+            <IconDownload size={15} />
             {downloading ? 'ダウンロード中...' : '選択したサムネイルをダウンロード'}
           </button>
           {resultMessage && (
@@ -171,6 +183,13 @@ export function ThumbnailGallery({ videos }: ThumbnailGalleryProps) {
                       onChange={() => toggleOne(v.videoId)}
                     />
                   </label>
+                  <StockButton
+                    variant="overlay"
+                    size="sm"
+                    stocked={stockedIds.has(v.videoId)}
+                    onToggle={() => onToggleStock(v)}
+                    className="absolute bottom-1 left-1"
+                  />
                 </div>
                 <a href={v.videoUrl} target="_blank" rel="noreferrer" className="block">
                   <div className="mt-1.5 text-xs">

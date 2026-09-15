@@ -6,10 +6,12 @@ import {
   KidsFilterKey,
   KIDS_FILTERS,
   MAX_RESULT_COUNTS,
+  normalizeKeyword,
   ResearchResult,
   SearchParams,
   SearchRegionCode,
   SEARCH_REGIONS,
+  Video,
   VIDEO_CATEGORIES
 } from './types';
 
@@ -22,6 +24,7 @@ const KEYS = {
   onboarded: 'yt-research:onboarded',
   quota: 'yt-research:quota',
   presets: 'yt-research:presets',
+  stocks: 'yt-research:stocks',
   myChannel: 'yt-research:my-channel',
   myChannelSnapshots: 'yt-research:my-channel-snapshots'
 };
@@ -309,6 +312,7 @@ const BACKUP_KEYS: string[] = [
   KEYS.onboarded,
   KEYS.quota,
   KEYS.presets,
+  KEYS.stocks,
   KEYS.myChannel,
   KEYS.myChannelSnapshots
 ];
@@ -503,6 +507,95 @@ export function getChannelSnapshots(channelId: string): Snapshot[] {
   if (!channelId) return [];
   const data = readStoredSnapshots();
   return (data.byChannel[channelId] || []).slice();
+}
+
+// ---- ストック（気になる動画の保存。検索キーワード別にグループ化） ----
+
+/**
+ * ストック1件。「どのキーワードで検索したときに見つけた動画か」を残すため、
+ * 同じ動画でもキーワードが違えば別エントリとして保存する（id = videoId + keyword）。
+ * video は保存時点のスナップショット（再生数などはストックした時の値）。
+ */
+export interface StockedVideo {
+  id: string;
+  videoId: string;
+  keyword: string; // グループ名（検索キーワード。正規化済み）
+  searchedAt: string; // 元になった検索の実行日時
+  stockedAt: string; // ストックした日時
+  memo: string;
+  video: Video;
+}
+
+// キーワードが空の結果（通常は起こらない）をまとめるためのグループ名。
+const STOCK_GROUP_FALLBACK = '（キーワードなし）';
+
+// グループ名は表記ゆれ（前後空白・連続空白）で分かれないよう正規化する。
+export function buildStockKeyword(keyword: string): string {
+  return normalizeKeyword(keyword) || STOCK_GROUP_FALLBACK;
+}
+
+export function buildStockId(videoId: string, keyword: string): string {
+  return `${videoId}::${buildStockKeyword(keyword)}`;
+}
+
+export function getStocks(): StockedVideo[] {
+  const list = safeRead<StockedVideo[]>(KEYS.stocks, []);
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(
+      (s) =>
+        s &&
+        typeof s.id === 'string' &&
+        typeof s.videoId === 'string' &&
+        typeof s.keyword === 'string' &&
+        s.video &&
+        typeof s.video === 'object'
+    )
+    .map((s) => ({ ...s, memo: typeof s.memo === 'string' ? s.memo : '' }));
+}
+
+/**
+ * ストックに追加する。同じ（動画×キーワード）が既にあれば何もしない。
+ * localStorage への書き込みに失敗（容量超過など）したときだけ false を返す。
+ */
+export function addStock(video: Video, keyword: string, searchedAt: string): boolean {
+  const groupKeyword = buildStockKeyword(keyword);
+  const id = buildStockId(video.videoId, groupKeyword);
+  const list = getStocks();
+  if (list.some((s) => s.id === id)) return true;
+  list.unshift({
+    id,
+    videoId: video.videoId,
+    keyword: groupKeyword,
+    searchedAt,
+    stockedAt: new Date().toISOString(),
+    memo: '',
+    video
+  });
+  return safeWrite(KEYS.stocks, list);
+}
+
+export function removeStock(id: string): StockedVideo[] {
+  const list = getStocks().filter((s) => s.id !== id);
+  safeWrite(KEYS.stocks, list);
+  return list;
+}
+
+// キーワード（グループ）単位でまとめて削除する。
+export function removeStocksByKeyword(keyword: string): StockedVideo[] {
+  const list = getStocks().filter((s) => s.keyword !== keyword);
+  safeWrite(KEYS.stocks, list);
+  return list;
+}
+
+export function updateStockMemo(id: string, memo: string): StockedVideo[] {
+  const list = getStocks().map((s) => (s.id === id ? { ...s, memo } : s));
+  safeWrite(KEYS.stocks, list);
+  return list;
+}
+
+export function clearStocks(): void {
+  localStorage.removeItem(KEYS.stocks);
 }
 
 export type { ResearchResult };

@@ -2,6 +2,8 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { getHeatTier } from '../lib/heat';
 import { Video } from '../lib/types';
 import { formatNumber } from '../lib/utils';
+import { StockButton } from './StockButton';
+import { IconFlame, IconList, IconSearch } from './icons';
 
 // 散布図（recharts 依存）は遅延読み込みして、メインチャンクから切り離す。
 const ScatterHeatChart = lazy(() =>
@@ -10,6 +12,9 @@ const ScatterHeatChart = lazy(() =>
 
 interface VideoListProps {
   videos: Video[];
+  // 表示中のキーワードでストック済みの videoId 集合と、しおりの付け外し。
+  stockedIds: Set<string>;
+  onToggleStock: (video: Video) => void;
 }
 
 type SortKey =
@@ -35,7 +40,7 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: 'durationSeconds', label: '動画尺' }
 ];
 
-export function VideoList({ videos }: VideoListProps) {
+export function VideoList({ videos, stockedIds, onToggleStock }: VideoListProps) {
   // ヒートスコアをデフォルトの並び順にする（今アツい順）。null は末尾。
   const [sortKey, setSortKey] = useState<SortKey>('heatScore');
   const [filter, setFilter] = useState('');
@@ -86,19 +91,28 @@ export function VideoList({ videos }: VideoListProps) {
 
   return (
     <div className="space-y-4">
-      {heroVideos.length > 0 && <HeatHero videos={heroVideos} />}
+      {heroVideos.length > 0 && <HeatHero videos={heroVideos} stockedIds={stockedIds} onToggleStock={onToggleStock} />}
       <ScatterMapCard videos={videos} />
       <div className="card">
         <div className="card-header flex flex-wrap items-center justify-between gap-2">
-          <span>動画リスト（{videos.length}件）</span>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="search"
-              placeholder="タイトル/チャンネル名で絞り込み"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="input w-56"
-            />
+          <div className="flex items-center gap-2">
+            <span className="section-icon bg-slate-100 text-slate-600">
+              <IconList size={15} />
+            </span>
+            <span>動画リスト</span>
+            <span className="badge bg-slate-100 text-slate-600">{videos.length}件</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm font-normal">
+            <label className="relative">
+              <IconSearch size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                placeholder="タイトル/チャンネル名で絞り込み"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="input w-60 pl-8"
+              />
+            </label>
             <select
               className="input w-48"
               value={sortKey}
@@ -119,6 +133,9 @@ export function VideoList({ videos }: VideoListProps) {
           <table className="table-base table-wide">
             <thead>
               <tr>
+                <th className="w-10 min-w-[40px] text-center" title="ストック">
+                  <span className="sr-only">ストック</span>
+                </th>
                 <th className="w-32 min-w-[128px]">サムネ</th>
                 <th>タイトル</th>
                 <th>チャンネル</th>
@@ -144,6 +161,9 @@ export function VideoList({ videos }: VideoListProps) {
                   tier === 'S' ? 'bg-amber-50 hover:bg-amber-100' : 'odd:bg-slate-50/50 hover:bg-slate-50';
                 return (
                   <tr key={v.videoId} className={rowClass}>
+                    <td className="w-10 text-center">
+                      <StockButton size="sm" stocked={stockedIds.has(v.videoId)} onToggle={() => onToggleStock(v)} />
+                    </td>
                     <td className="min-w-[128px] overflow-visible">
                       {v.thumbnailUrl && (
                         <a href={v.videoUrl} target="_blank" rel="noreferrer">
@@ -194,7 +214,7 @@ export function VideoList({ videos }: VideoListProps) {
                     <td className="text-right">{formatEngagement(v.engagementRate)}</td>
                     <td>{v.duration}</td>
                     <td className="whitespace-nowrap">{v.publishedDate}</td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <a
                         href={v.videoUrl}
                         target="_blank"
@@ -262,14 +282,34 @@ function ChartLoading() {
 }
 
 // 「今アツい動画 TOP5」ヒーロー。heatScore 上位をカード横並びで表示する。
-function HeatHero({ videos }: { videos: Video[] }) {
+function HeatHero({
+  videos,
+  stockedIds,
+  onToggleStock
+}: {
+  videos: Video[];
+  stockedIds: Set<string>;
+  onToggleStock: (video: Video) => void;
+}) {
   return (
     <div className="card">
-      <div className="card-header">🔥 今アツい動画 TOP5</div>
+      <div className="card-header">
+        <span className="section-icon bg-heat-50 text-heat-600">
+          <IconFlame size={15} />
+        </span>
+        <span>今アツい動画 TOP5</span>
+        <span className="ml-1 text-xs font-normal text-slate-400">ヒートスコア上位</span>
+      </div>
       <div className="card-body">
         <div className="flex gap-3 overflow-x-auto snap-x pb-1">
           {videos.map((v, index) => (
-            <HeatHeroCard key={v.videoId} video={v} rank={index + 1} />
+            <HeatHeroCard
+              key={v.videoId}
+              video={v}
+              rank={index + 1}
+              stocked={stockedIds.has(v.videoId)}
+              onToggleStock={() => onToggleStock(v)}
+            />
           ))}
         </div>
       </div>
@@ -277,27 +317,41 @@ function HeatHero({ videos }: { videos: Video[] }) {
   );
 }
 
-function HeatHeroCard({ video, rank }: { video: Video; rank: number }) {
+function HeatHeroCard({
+  video,
+  rank,
+  stocked,
+  onToggleStock
+}: {
+  video: Video;
+  rank: number;
+  stocked: boolean;
+  onToggleStock: () => void;
+}) {
   const score = Math.round(video.heatScore ?? 0);
+  // しおりボタンは <a> の外に置く（リンクの中にボタンを入れない）。
   return (
-    <a
-      href={video.videoUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="group relative w-52 shrink-0 snap-start rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-    >
+    <div className="group relative w-52 shrink-0 snap-start rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <span className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-heat-500 text-xs font-bold text-white shadow">
         {rank}
       </span>
-      <div className="aspect-video w-full overflow-hidden rounded-t-xl bg-slate-100">
-        {video.thumbnailUrl && (
-          <img src={video.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-        )}
-      </div>
-      <div className="p-3">
-        <div className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-slate-800 group-hover:text-brand-600">
-          {video.title}
+      <StockButton variant="overlay" size="sm" stocked={stocked} onToggle={onToggleStock} className="absolute right-2 top-2 z-10" />
+      <a href={video.videoUrl} target="_blank" rel="noreferrer" className="block">
+        <div className="aspect-video w-full overflow-hidden rounded-t-xl bg-slate-100">
+          {video.thumbnailUrl && (
+            <img src={video.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          )}
         </div>
+      </a>
+      <div className="p-3">
+        <a
+          href={video.videoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-slate-800 hover:text-brand-600"
+        >
+          {video.title}
+        </a>
         <div className="mt-2 flex items-center gap-3">
           <HeatGauge score={score} />
           <div className="flex flex-wrap gap-1">
@@ -313,7 +367,7 @@ function HeatHeroCard({ video, rank }: { video: Video; rank: number }) {
           </div>
         </div>
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -365,8 +419,12 @@ function formatEngagement(value: number | null): string {
 function EmptyState() {
   return (
     <div className="card">
-      <div className="card-body text-center text-slate-500">
-        まだリサーチを実行していません。ホームでキーワードを入力して「▶ リサーチ実行」を押してください。
+      <div className="card-body flex flex-col items-center py-14 text-center text-slate-500">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <IconSearch size={26} />
+        </span>
+        <p className="mt-4 text-sm">まだリサーチを実行していません。</p>
+        <p className="mt-1 text-xs text-slate-400">ホームでキーワードを入力して「リサーチ実行」を押してください。</p>
       </div>
     </div>
   );

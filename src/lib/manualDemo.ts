@@ -13,7 +13,8 @@ export type ManualDemoMode =
   | 'competitors'
   | 'thumbnails'
   | 'history'
-  | 'mychannel';
+  | 'mychannel'
+  | 'stocks';
 
 const SVG_TEMPLATE = (title: string, accent: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -556,7 +557,8 @@ export function getManualDemoMode(): ManualDemoMode | null {
     'competitors',
     'thumbnails',
     'history',
-    'mychannel'
+    'mychannel',
+    'stocks'
   ];
   return allowed.includes(raw as ManualDemoMode) ? (raw as ManualDemoMode) : null;
 }
